@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>数字电路仿真实验室</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden}
+  body{
+    background:#0d1117;color:#dbe3ee;
+    font:14px/1.55 ui-sans-serif,system-ui,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    --line:#29323f;--panel:#11161e;--chip:#161c26;--ok:#3ddc97;--warn:#e5534b;--info:#4d9dff;
+  }
+  .app{
+    display:grid;height:100%;
+    grid-template-columns:222px minmax(0,1fr);
+    grid-template-rows:auto minmax(0,1fr) var(--dock,30vh);
+    grid-template-areas:"hd hd" "pl st" "dk dk";
+  }
+  body.nomax .app{--dock:38px}
+
+  header{grid-area:hd;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:9px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+  .brand{font-weight:700;letter-spacing:.3px;margin-right:6px;white-space:nowrap}
+  .brand em{font-style:normal;color:#6d7a8c;font-weight:500;font-size:12px;margin-left:6px}
+  .brand i{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--ok);margin-right:7px;box-shadow:0 0 8px var(--ok)}
+  .grp{display:flex;gap:6px;align-items:center;padding:0 8px;border-left:1px solid var(--line)}
+  .grp:first-of-type{border-left:0}
+  button,select,input[type=number]{background:var(--chip);border:1px solid var(--line);color:#dbe3ee;border-radius:8px;padding:5px 10px;font:inherit;cursor:pointer}
+  button:hover,select:hover{background:#1e2632;border-color:#3a4658}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.on{background:#1c3b2c;border-color:#2f6b48;color:#8ef0bd}
+  label.inline{display:flex;gap:7px;align-items:center;font-size:12px;color:#8b98ab;cursor:default}
+  input[type=range]{width:96px;accent-color:var(--ok)}
+  output{color:#dbe3ee;font-variant-numeric:tabular-nums;min-width:46px}
+
+  aside{grid-area:pl;background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:10px}
+  .pgroup{margin:10px 0 4px;font-size:11px;letter-spacing:1px;color:#6d7a8c;text-transform:uppercase}
+  .items{display:flex;flex-wrap:wrap;gap:7px}
+  .item{width:94px;padding:4px 4px 5px;border:1px solid var(--line);border-radius:9px;background:#0f141b;cursor:grab;text-align:center;user-select:none}
+  .item:hover{border-color:var(--ok);background:#132019}
+  .item canvas{width:86px;height:38px;display:block}
+  .item span{font-size:11px;color:#9aa7b8;display:block}
+  .phint{font-size:11px;color:#6d7a8c;background:#0f141b;border:1px dashed var(--line);border-radius:8px;padding:6px 8px}
+
+  main{grid-area:st;position:relative;min-width:0;background:#0d1117}
+  #board{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair}
+  .hud{position:absolute;left:10px;top:10px;display:flex;gap:8px;flex-wrap:wrap;pointer-events:none;font-size:12px}
+  .hud div{background:#11161ecc;border:1px solid var(--line);border-radius:7px;padding:3px 8px;font-variant-numeric:tabular-nums}
+  .hud .bad{border-color:#6e2b2b;color:#ff9d97}
+  .hud .good{color:#8ef0bd}
+  .hud .legend{display:flex;align-items:center;color:#8b98ab}
+  .hud .d{width:9px;height:9px;border-radius:50%;display:inline-block;margin:0 3px 0 8px}
+  .hud .d.v1{background:#3ddc97}
+  .hud .d.v0{background:#586374}
+  .hud .d.vx{background:#0d1117;border:1.5px solid #4d9dff}
+  .zoom{position:absolute;right:10px;top:10px;display:flex;gap:6px}
+  .zoom button{padding:3px 9px}
+  .toast{position:absolute;left:50%;top:16px;transform:translateX(-50%);background:#1c3b2c;border:1px solid #2f6b48;color:#8ef0bd;padding:6px 14px;border-radius:999px;font-size:12px;opacity:0;transition:opacity .25s;pointer-events:none}
+  .toast.show{opacity:1}
+  .tip{position:absolute;right:12px;bottom:12px;max-width:290px;background:#11161ef2;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12px;color:#aab6c6}
+  .tip b{color:#dbe3ee}
+  .tip button{margin-top:7px;padding:2px 8px;font-size:11px}
+
+  section.dock{grid-area:dk;display:flex;flex-direction:column;min-height:0;background:var(--panel);border-top:1px solid var(--line)}
+  .tabs{display:flex;gap:4px;padding:5px 10px 0;border-bottom:1px solid var(--line);align-items:center}
+  .tabs button{border:0;background:transparent;border-radius:7px 7px 0 0;color:#8b98ab;padding:5px 12px}
+  .tabs button.on{color:#8ef0bd;background:#0d1117;box-shadow:inset 0 -2px 0 var(--ok)}
+  .tabs .spacer{flex:1}
+  .pane{flex:1;min-height:0;overflow:auto;padding:8px 12px}
+  .pane.hide{display:none}
+  #scope{width:100%;height:100%;display:block}
+  .pane#p-scope{padding:6px 8px;display:flex}
+  .kv{display:grid;grid-template-columns:88px minmax(0,1fr);gap:6px 10px;align-items:center;font-size:12px;max-width:760px}
+  .kv .k{color:#8b98ab}
+  .kv .v{font-variant-numeric:tabular-nums}
+  .kv input[type=text],.kv input[type=number]{width:110px;cursor:text}
+  .kv input[type=text]{min-width:180px}
+  .badges{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+  .b{border:1px solid var(--line);border-radius:6px;padding:2px 7px;font-size:11px;color:#9aa7b8;background:#0f141b}
+  .b.h1{border-color:#2f6b48;color:#8ef0bd}
+  .b.hx{border-color:#2c4a72;color:#89bdf7}
+  .rowline{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+  .help{max-width:820px;font-size:13px;color:#aab6c6}
+  .help h4{color:#dbe3ee;margin:14px 0 6px;font-size:13px}
+  .help ul{margin:0;padding-left:18px}
+  .help kbd{background:#0f141b;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 5px;font:11px ui-monospace,Consolas,monospace;color:#dbe3ee}
+  .help code{color:#89bdf7}
+  .v0{color:#8b98ab}.v1{color:#8ef0bd}.vX{color:#89bdf7}
+  @media (max-width:900px){
+    .app{grid-template-columns:1fr;grid-template-rows:auto auto minmax(0,1fr) var(--dock,30vh);grid-template-areas:"hd" "pl" "st" "dk"}
+    aside{border-right:0;border-bottom:1px solid var(--line);max-height:130px}
+    .item{width:76px}.item canvas{width:68px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><i></i>数字电路仿真实验室<em>Digital Lab</em></div>
+    <div class="grp">
+      <button id="bRun" class="primary">▶ 运行</button>
+      <button id="bStep" title="推进一个时钟节拍">⏭ 单步</button>
+      <button id="bReset" title="清零触发器与波形">↺ 复位</button>
+    </div>
+    <div class="grp">
+      <label class="inline">节拍 <input id="hz" type="range" min="1" max="10" step="1" value="2"><output id="hzv">2 Hz</output></label>
+    </div>
+    <div class="grp">
+      <button id="bUndo" title="Ctrl+Z">撤销</button>
+      <select id="preset" title="载入示例电路">
+        <option value="">示例电路…</option>
+        <option value="divider">D 触发器二分频</option>
+        <option value="srlatch">NAND 交叉耦合 SR 锁存</option>
+        <option value="fulladder">一位全加器</option>
+      </select>
+    </div>
+    <div class="grp">
+      <button id="bSave">保存</button>
+      <button id="bOpen">载入</button>
+      <button id="bExport">导出</button>
+      <button id="bImport">导入</button>
+      <button id="bClear">清空</button>
+      <input id="fileIn" type="file" accept=".json,application/json" hidden>
+    </div>
+  </header>
+
+  <aside><div class="phint">单击即放到画布并自动找空位，也可拖到指定位置。从引脚拖出连线；把输入引脚拖到<b>已有的线上</b>会插入分线器形成分支。</div><div id="pal"></div></aside>
+
+  <main>
+    <canvas id="board"></canvas>
+    <div class="hud">
+      <div>节拍 <b id="hTick">0</b></div>
+      <div id="hStat" class="good">稳定</div>
+      <div>元件 <b id="hN">0</b> · 连线 <b id="hW">0</b></div>
+      <div class="legend"><i class="d v1"></i>1<i class="d v0"></i>0<i class="d vx"></i>X 悬空/未知</div>
+    </div>
+    <div class="zoom">
+      <button id="zOut">−</button><button id="zIn">+</button><button id="zFit">适应</button>
+    </div>
+    <div class="toast" id="toast"></div>
+    <div class="tip" id="tip">
+      <b>上手要点</b><br>
+      1. 左侧元件点一下或拖到画布，新元件会自动找空位，不会叠在一起；<br>
+      2. 鼠标移到引脚（小圆圈）上按住，拖到另一个引脚就成一条线；把<em>输入</em>引脚拖到<em>已有的线上</em>会插入分线器形成分支，一个输出也能直接接多个输入（扇出）；<br>
+      3. 蓝色空心引脚 = 悬空，值是 X（未知）。<b>门的每个输入都连上才会输出 0/1</b>，只连一半时输出必然是 X，这不是坏了；<br>
+      4. 开关在画布上点一下就翻转；时钟靠「运行／单步」走拍，底部波形面板记录每一拍；<br>
+      5. <b>右键</b>元件或连线直接删除（Ctrl+Z 撤销）；触发器的采样沿在属性面板里切换上升/下降沿；<br>
+      6. 波形太挤时，点波形面板左列的<b>信号名</b>就把这个元件的波形关掉，点底部「已隐藏 …↩」的名字恢复。
+      <br><button id="tipClose">知道了</button>
+    </div>
+  </main>
+
+  <section class="dock">
+    <div class="tabs">
+      <button data-p="scope" class="on">波形</button>
+      <button data-p="prop">属性</button>
+      <button data-p="help">帮助</button>
+      <span class="spacer"></span>
+      <button id="bMax">收起</button>
+    </div>
+    <div class="pane" id="p-scope"><canvas id="scope"></canvas></div>
+    <div class="pane hide" id="p-prop"><div id="propBody"></div></div>
+    <div class="pane hide" id="p-help">
+      <div class="help">
+        <h4>元件库</h4>
+        <ul>
+          <li><b>输入</b>：开关（点画布上的开关即可翻转）、时钟（可自动按节拍走，也可手动）。</li>
+          <li><b>门</b>：与/或/非/与非/或非/异或/同或/缓冲/二选一。多数门支持 2–4 个输入，在属性面板里改。</li>
+          <li><b>时序</b>：D 触发器、JK 触发器，默认在时钟<em>上升沿</em>（0→1）采样，属性面板可改成<em>下降沿</em>（1→0）；画布上 CLK 引脚标着 <b>↑</b> 或 <b>↓</b>，一眼能看出这台触发器看哪个沿。把 Q̄ 接回 D 就构成二分频。</li>
+          <li>沿是相对「上一拍」判断的：只有当时钟引脚的电平从 0 变 1（或 1 变 0）那一拍才写入 D/J/K，其它拍保持原值，所以手动时钟要先让它翻转一次。</li>
+          <li><b>布线</b>：分线器，1 入 n 出（2–6），把一条信号原样分成多份；属性面板里可调分支数。</li>
+        </ul>
+        <h4>仿真规则</h4>
+        <ul>
+          <li>三值逻辑：<span class="v1">1</span> 高电平、<span class="v0">0</span> 低电平、<span class="vX">X</span> 悬空或未定（蓝色虚线）。门的输入没连满时输出就是 X，指示灯也不会亮——这是有意的，不把未知当成 0。</li>
+          <li>与/或门有空传：只要有一个输入是 0，与门输出就是 0，即使别的输入悬空。</li>
+          <li>组合反馈（如两个与非门交叉耦合）按不动点迭代求稳态；若 64 轮仍不收敛，HUD 会标红提示<b>振荡</b>，此时输出处于逐轮翻转的伪振荡状态，可用它近似看环振。</li>
+          <li>触发器的复位/未连接输入按 0 处理，不建模亚稳态。</li>
+        </ul>
+        <h4>快捷键</h4>
+        <ul>
+          <li><kbd>Space</kbd> 运行/暂停 · <kbd>N</kbd> 单步 · <kbd>Del</kbd> 删除选中 · <kbd>右键</kbd> 删除命中的元件/连线 · <kbd>Ctrl</kbd>+<kbd>Z</kbd> 撤销 · <kbd>Esc</kbd> 取消当前连线/选择</li>
+          <li><kbd>滚轮</kbd> 以光标为中心缩放 · <kbd>中键</kbd>或<kbd>Alt</kbd>拖拽平移 · <kbd>Ctrl</kbd>+<kbd>滚轮</kbd>同样缩放</li>
+        </ul>
+        <h4>连线与编辑</h4>
+        <ul>
+          <li>从输出引脚拖到输入引脚；一个输入只跟一根线，重复连接会自动替换旧线（替换中的引脚显示黄色）。</li>
+          <li>反向也支持：从输入引脚拖到输出引脚。点连线选中它，按 <kbd>Del</kbd> 删除。</li>
+          <li><b>删除</b>：<kbd>右键</kbd>点元件/连线即刻删除（元件若在一组多选里则整组删除），连带删掉挂在它上面的线；<kbd>Ctrl</kbd>+<kbd>Z</kbd> 可撤销。右键空白处什么都不做，不会误删。</li>
+          <li><b>分支</b>：从输入引脚起拖，松手时落在<em>另一条线</em>上，会在线的中点插入分线器，两个输入共享同一路信号；若那条线本身就来自分线器，则直接多加一条支路。</li>
+          <li><b>扇出</b>：同一个输出引脚可以拖出任意多条线，不必用分线器。</li>
+          <li>新放置的元件会自动避开已有元件（从中心向外找空位），不会叠在一起。</li>
+          <li>在空白处拖框可多选；多选后拖动任意一个，整组一起移动。</li>
+          <li>输出可扇出到多个输入，输出接输出、输入接输入都不允许。</li>
+        </ul>
+        <h4>其它</h4>
+        <ul>
+          <li>电路自动存在浏览器本地（localStorage），刷新不丢；「导出」可存成 JSON 文件分享。</li>
+          <li>波形面板自动列出所有元件的输出（以及指示灯的输入），最多 24 条、保留最近 160 拍。</li>
+          <li><b>关掉某个元件的波形</b>：点波形面板左列的信号名即可隐藏它这一行（同一元件的 Q/Q̄ 一起关），再点波形底部「已隐藏 …↩」的名字就恢复；属性面板里也有「在波形面板显示」勾选框，走哪条路都一样。隐藏只是不画，数据仍在记录，恢复后历史不断档，且会随电路一起存档。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+'use strict';
+const X = -1;
+const isX = v => v === X;
+const vAND = a => a.some(v => v === 0) ? 0 : a.every(v => v === 1) ? 1 : X;
+const vOR  = a => a.some(v => v === 1) ? 1 : a.every(v => v === 0) ? 0 : X;
+const vNOT = v => isX(v) ? X : 1 - v;
+const vXOR = a => a.some(isX) ? X : a.reduce((p, v) => p ^ v, 0);
+
+const CATS = {
+  src:  { band: '#3d7ea6' },
+  sink: { band: '#a3743f' },
+  gate: { band: '#3f4a5e' },
+  seq:  { band: '#6c53a8' },
+};
+
+const PARTS = {
+  SWITCH: { tag: 'SW',   title: '开关',     cat: 'src',  outs: ['O'],            fn: (i, c) => [c.props.state ? 1 : 0] },
+  CLOCK:  { tag: 'CLK',  title: '时钟',     cat: 'src',  outs: ['CLK'],          fn: (i, c) => [clockValue(c)] },
+  LED:    { tag: 'LED',  title: '指示灯',   cat: 'sink', ins: ['A'],   outs: [],  fn: () => [] },
+  AND:    { tag: 'AND',  title: '与门',     cat: 'gate', varIn: 2, outs: ['Y'], fn: i => [vAND(i)] },
+  OR:     { tag: 'OR',   title: '或门',     cat: 'gate', varIn: 2, outs: ['Y'], fn: i => [vOR(i)] },
+  NOT:    { tag: 'NOT',  title: '非门',     cat: 'gate', ins: ['A'],   outs: ['Y'], fn: i => [vNOT(i[0])] },
+  NAND:   { tag: 'NAND', title: '与非门',   cat: 'gate', varIn: 2, outs: ['Y'], fn: i => [vNOT(vAND(i))] },
+  NOR:    { tag: 'NOR',  title: '或非门',   cat: 'gate', varIn: 2, outs: ['Y'], fn: i => [vNOT(vOR(i))] },
+  XOR:    { tag: 'XOR',  title: '异或门',   cat: 'gate', varIn: 2, outs: ['Y'], fn: i => [vXOR(i)] },
+  XNOR:   { tag: 'XNOR', title: '同或门',   cat: 'gate', varIn: 2, outs: ['Y'], fn: i => [vNOT(vXOR(i))] },
+  BUF:    { tag: 'BUF',  title: '缓冲器',   cat: 'gate', ins: ['A'],   outs: ['Y'], fn: i => [i[0]] },
+  MUX:    { tag: 'MUX',  title: '二选一',   cat: 'gate', ins: ['D0', 'D1', 'S'], outs: ['Y'],
+            fn: i => [isX(i[2]) ? X : i[2] === 0 ? i[0] : i[1]] },
+  SPLIT:  { tag: '分',   title: '分线器',   cat: 'gate', ins: ['A'], varOut: 3,
+            fn: (i, c) => new Array(outCount(c)).fill(i[0]) },
+  DFF:    { tag: 'D',    title: 'D 触发器', cat: 'seq',  ins: ['D', 'CLK'],  outs: ['Q', 'Q̄'], fn: () => [] },
+  JKFF:   { tag: 'J/K',  title: 'JK 触发器', cat: 'seq', ins: ['J', 'K', 'CLK'], outs: ['Q', 'Q̄'], fn: () => [] },
+};
+const GROUPS = [
+  ['输入', ['SWITCH', 'CLOCK']],
+  ['输出', ['LED']],
+  ['门电路', ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR', 'XNOR', 'BUF', 'MUX']],
+  ['时序', ['DFF', 'JKFF']],
+  ['布线', ['SPLIT']],
+];
+const PIN_NAMES = ['A', 'B', 'C', 'D'];
+const SPLIT_OUT = ['Y1', 'Y2', 'Y3', 'Y4', 'Y5', 'Y6'];
+
+const state = {
+  comps: [], wires: [], sel: new Set(), selWire: null,
+  tick: 0, running: false, hz: 2, unstable: false, nextId: 1,
+  view: { x: 0, y: 0, k: 1 },
+};
+const scope = { series: new Map(), max: 160, limit: 24, lastTick: -1 };
+const undoStack = [];
+let dpr = 1;
+
+/* ---------------- 元件与几何 ---------------- */
+const isSeq = c => PARTS[c.type].cat === 'seq';
+const isSrc = c => PARTS[c.type].cat === 'src';
+function inCount(c) { const p = PARTS[c.type]; return p.varIn ? Math.max(1, Math.min(4, c.props.n || p.varIn)) : (p.ins ? p.ins.length : 0); }
+function outCount(c) { const p = PARTS[c.type]; return p.varOut ? Math.max(1, Math.min(6, c.props.m || p.varOut)) : (p.outs ? p.outs.length : 0); }
+function inNames(c) { const p = PARTS[c.type]; return p.varIn ? PIN_NAMES.slice(0, inCount(c)) : (p.ins || []); }
+function outNames(c) { const p = PARTS[c.type]; return p.varOut ? SPLIT_OUT.slice(0, outCount(c)) : (p.outs || []); }
+const BW = 104;
+function boxOf(c) {
+  const n = Math.max(inCount(c), outCount(c), 1);
+  return { x: c.x, y: c.y, w: c.type === 'LED' ? 74 : c.type === 'CLOCK' ? 92 : BW, h: 24 * n + 26 };
+}
+function inPins(c) { const b = boxOf(c), n = inCount(c), r = []; for (let i = 0; i < n; i++) r.push({ x: b.x, y: b.y + b.h * (i + 1) / (n + 1), i }); return r; }
+function outPins(c) { const b = boxOf(c), n = outCount(c), r = []; for (let i = 0; i < n; i++) r.push({ x: b.x + b.w, y: b.y + b.h * (i + 1) / (n + 1), i }); return r; }
+const byId = id => state.comps.find(c => c.id === id);
+const label = c => c.props.label || (PARTS[c.type].tag + c.id);
+
+function mk(type, x, y, props = {}) {
+  const p = { id: state.nextId++, type, x: Math.round(x), y: Math.round(y), props: { ...props } };
+  p.out = new Array(outCount(p)).fill(0);
+  p.prevClk = X;
+  return p;
+}
+
+/* ---------------- 仿真内核 ---------------- */
+function clockValue(c) {
+  const d = Math.max(1, c.props.div || 1);
+  return c.props.auto ? Math.floor(state.tick / d) % 2 : (c.props.state ? 1 : 0);
+}
+function srcOf(id, p) { return state.wires.find(w => w.b.id === id && w.b.p === p); }
+function refValue(ref) { const c = byId(ref.id); if (!c) return X; const v = c.out[ref.p]; return v === undefined ? X : v; }
+function inValues(c) {
+  const r = [];
+  for (let i = 0; i < inCount(c); i++) { const s = srcOf(c.id, i); r.push(s ? refValue(s.a) : X); }
+  return r;
+}
+const sameVals = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+function settle() {
+  let unstable = true;
+  for (let round = 0; round < 64; round++) {
+    let changed = false;
+    for (const c of state.comps) {
+      if (isSeq(c)) continue;
+      const outs = PARTS[c.type].fn(inValues(c), c);
+      if (!sameVals(c.out, outs)) { c.out = outs; changed = true; }
+    }
+    if (!changed) { unstable = false; break; }
+  }
+  state.unstable = unstable;
+}
+
+function capture() {
+  for (const c of state.comps) {
+    if (!isSeq(c)) continue;
+    const ins = inValues(c);
+    const ci = inCount(c) - 1;
+    const clk = ins[ci], prev = c.prevClk;
+    const fired = c.props.edge === 0 ? prev === 1 && clk === 0 : prev === 0 && clk === 1;
+    if (fired) {
+      let q = c.out[0]; if (isX(q)) q = 0;
+      if (c.type === 'DFF') q = ins[0];
+      else {
+        const j = ins[0], k = ins[1];
+        if (isX(j) || isX(k)) q = X;
+        else if (j === 1 && k === 1) q = 1 - q;
+        else if (j === 1) q = 1;
+        else if (k === 1) q = 0;
+      }
+      if (isX(q)) q = 0;
+      c.out = [q, vNOT(q)];
+    }
+    c.prevClk = clk;
+  }
+}
+
+function evaluateAll() {
+  settle(); capture(); settle(); pushFrame(); renderHud(); renderProps(); draw(); markDirty();
+}
+function advance() { state.tick++; evaluateAll(); }
+
+/* ---------------- 波形记录 ---------------- */
+function signalRows() {
+  const rows = [];
+  for (const c of state.comps) {
+    const n = outCount(c);
+    if (n === 0) {
+      if (inCount(c) > 0) rows.push({ key: 'in' + c.id, label: label(c) + '.IN', cid: c.id, get: () => inValues(c)[0] });
+    } else {
+      for (let i = 0; i < n; i++) rows.push({ key: c.id + '.' + i, label: label(c) + '.' + outNames(c)[i], cid: c.id, get: () => c.out[i] });
+    }
+  }
+  return rows.slice(0, scope.limit);
+}
+function pushFrame() {
+  const rows = signalRows();
+  if (!rows.length) { scope.series.clear(); return; }
+  let len = 0;
+  for (const s of scope.series.values()) len = Math.max(len, s.data.length);
+  rows.forEach(r => { if (!scope.series.has(r.key)) scope.series.set(r.key, { label: r.label, cid: r.cid, data: new Array(len).fill(X) }); });
+  for (const key of [...scope.series.keys()]) if (!rows.some(r => r.key === key)) scope.series.delete(key);
+  const vals = rows.map(r => r.get());
+  // 同一拍内的反复编辑不重复记录，跨拍则一定落一帧，保证波形随节拍推进
+  if (state.tick === scope.lastTick && vals.every((v, i) => { const d = scope.series.get(rows[i].key).data; return d.length && d[d.length - 1] === v; })) return;
+  scope.lastTick = state.tick;
+  rows.forEach((r, i) => { const d = scope.series.get(r.key).data; d.push(vals[i]); if (d.length > scope.max) d.shift(); });
+}
+function resetScope() { scope.series.clear(); scope.lastTick = -1; }
+
+/* ---------------- 画布渲染 ---------------- */
+const board = document.getElementById('board');
+const bg = board.getContext('2d');
+const scopeCv = document.getElementById('scope');
+const sg = scopeCv.getContext('2d');
+const color = v => v === 1 ? '#3ddc97' : v === 0 ? '#586374' : '#4d9dff';
+
+function fitCanvas(cv) {
+  const r = cv.getBoundingClientRect();
+  dpr = window.devicePixelRatio || 1;
+  cv.width = Math.max(1, Math.round(r.width * dpr));
+  cv.height = Math.max(1, Math.round(r.height * dpr));
+}
+function roundRect(g, x, y, w, h, r) {
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+function wirePts(w) {
+  const A = byId(w.a.id), B = byId(w.b.id); if (!A || !B) return null;
+  const pa = outPins(A)[w.a.p], pb = inPins(B)[w.b.p]; if (!pa || !pb) return null;
+  const dx = Math.max(28, Math.abs(pb.x - pa.x) * 0.45);
+  return [pa, { x: pa.x + dx, y: pa.y }, { x: pb.x - dx, y: pb.y }, pb];
+}
+function bez(p, t) {
+  const u = 1 - t;
+  return {
+    x: u * u * u * p[0].x + 3 * u * u * t * p[1].x + 3 * u * t * t * p[2].x + t * t * t * p[3].x,
+    y: u * u * u * p[0].y + 3 * u * u * t * p[1].y + 3 * u * t * t * p[2].y + t * t * t * p[3].y,
+  };
+}
+
+function drawWire(g, w, hot) {
+  const p = wirePts(w); if (!p) return;
+  const v = refValue(w.a);
+  g.setLineDash(v === X ? [5, 4] : []);
+  g.strokeStyle = hot ? '#f0c33c' : color(v);
+  g.lineWidth = hot ? 3 : 2;
+  g.beginPath(); g.moveTo(p[0].x, p[0].y); g.bezierCurveTo(p[1].x, p[1].y, p[2].x, p[2].y, p[3].x, p[3].y); g.stroke();
+  g.setLineDash([]);
+}
+function pinDot(g, pt, v, hot) {
+  g.beginPath(); g.arc(pt.x, pt.y, hot ? 7 : 4.8, 0, 7);
+  g.fillStyle = v === 1 ? '#3ddc97' : v === 0 ? '#39424f' : '#0d1117';
+  g.fill();
+  g.lineWidth = 1.7; g.strokeStyle = hot ? '#f0c33c' : color(v); g.stroke();
+}
+function drawComp(g, c, opt = {}) {
+  const p = PARTS[c.type], b = boxOf(c), k = state.view.k;
+  roundRect(g, b.x, b.y, b.w, b.h, 9);
+  g.fillStyle = opt.sel ? '#152a20' : '#151b25';
+  g.fill();
+  g.save(); roundRect(g, b.x, b.y, b.w, b.h, 9); g.clip();
+  g.fillStyle = CATS[p.cat].band; g.fillRect(b.x, b.y, 5, b.h);
+  if (c.type === 'LED' && c.out.length === 0) {
+    const lit = inValues(c)[0] === 1;
+    g.beginPath(); g.arc(b.x + b.w / 2, b.y + b.h / 2 + 6, 10, 0, 7);
+    g.fillStyle = lit ? '#3ddc97' : '#242c38'; g.fill();
+    if (lit) { g.shadowColor = '#3ddc97'; g.shadowBlur = 16; g.fill(); g.shadowBlur = 0; }
+    g.strokeStyle = '#3a4658'; g.lineWidth = 1.4; g.stroke();
+  }
+  if (c.type === 'SWITCH') {
+    const on = !!c.props.state, px = b.x + b.w / 2;
+    roundRect(g, px - 17, b.y + b.h / 2 + 1, 34, 15, 8);
+    g.fillStyle = on ? '#1c3b2c' : '#242c38'; g.fill();
+    g.strokeStyle = on ? '#2f6b48' : '#3a4658'; g.lineWidth = 1.2; g.stroke();
+    g.beginPath(); g.arc(on ? px + 9 : px - 9, b.y + b.h / 2 + 8.5, 5.2, 0, 7);
+    g.fillStyle = on ? '#8ef0bd' : '#8b98ab'; g.fill();
+  }
+  if (c.type === 'CLOCK') {
+    const px = b.x + b.w / 2, py = b.y + b.h / 2 + 12, hi = c.out[0] === 1;
+    g.strokeStyle = c.props.auto ? (hi ? '#3ddc97' : '#586374') : '#8b98ab';
+    g.lineWidth = 2; g.beginPath();
+    g.moveTo(px - 22, py); g.lineTo(px - 14, py); g.lineTo(px - 14, py - 11); g.lineTo(px - 3, py - 11);
+    g.lineTo(px - 3, py); g.lineTo(px + 8, py); g.lineTo(px + 8, py - 11); g.lineTo(px + 20, py - 11);
+    g.stroke();
+    g.fillStyle = '#7d8b9f'; g.font = '9px ui-sans-serif,"PingFang SC",sans-serif'; g.textAlign = 'center';
+    g.fillText(c.props.auto ? '自动 ÷' + Math.max(1, c.props.div || 1) : '手动', px, b.y + 16);
+  }
+  g.restore();
+  g.lineWidth = opt.sel ? 2 : 1.2;
+  g.strokeStyle = opt.sel ? '#3ddc97' : p.cat === 'seq' ? '#54406f' : '#2a3444';
+  roundRect(g, b.x, b.y, b.w, b.h, 9); g.stroke();
+
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillStyle = '#e6edf6'; g.font = '600 13px ui-sans-serif,system-ui,"PingFang SC",sans-serif';
+  if (c.type !== 'CLOCK') g.fillText(p.tag, b.x + b.w / 2 + 2, b.y + 16);
+  if (c.props.label) {
+    g.fillStyle = '#8b98ab'; g.font = '11px ui-sans-serif,system-ui,"PingFang SC",sans-serif';
+    g.fillText(c.props.label, b.x + b.w / 2, b.y + b.h + 11);
+  }
+  if (k > 0.5) {
+    g.font = '9px ui-monospace,Consolas,monospace'; g.fillStyle = '#8ea0b5'; g.textBaseline = 'middle';
+    g.textAlign = 'left';
+    const names = inNames(c);
+    inPins(c).forEach((pt, i) => {
+      const clkPin = p.cat === 'seq' && i === names.length - 1;
+      g.fillText(names[i] + (clkPin ? (c.props.edge === 0 ? '↓' : '↑') : ''), pt.x + 7, pt.y);
+    });
+    g.textAlign = 'right';
+    outNames(c).forEach((n, i) => { const pt = outPins(c)[i]; g.fillText(n, pt.x - 7, pt.y); });
+  }
+  const iv = inValues(c), same = (r, s) => r && s && r.id === s.id && r.side === s.side && r.p === s.p;
+  const hotIn = p2 => opt.hoverIn && same(opt.hoverIn, p2) || same(opt.wireTarget, p2);
+  const hotOut = p2 => same(opt.hoverOut, p2);
+  inPins(c).forEach((pt, i) => pinDot(g, pt, iv[i], hotIn({ id: c.id, side: 'in', p: i })));
+  outPins(c).forEach((pt, i) => pinDot(g, pt, c.out[i], hotOut({ id: c.id, side: 'out', p: i })));
+}
+
+let hover = null;
+function draw() {
+  const r = board.getBoundingClientRect(), k = state.view.k;
+  bg.setTransform(dpr, 0, 0, dpr, 0, 0);
+  bg.fillStyle = '#0d1117'; bg.fillRect(0, 0, r.width, r.height);
+  bg.save(); bg.translate(state.view.x, state.view.y); bg.scale(k, k);
+  const step = k < 0.6 ? 72 : 24;
+  const x0 = -state.view.x / k, y0 = -state.view.y / k, x1 = x0 + r.width / k, y1 = y0 + r.height / k;
+  bg.fillStyle = '#1b2230';
+  for (let x = Math.floor(x0 / step) * step; x < x1; x += step)
+    for (let y = Math.floor(y0 / step) * step; y < y1; y += step) { bg.beginPath(); bg.arc(x, y, 1.1, 0, 7); bg.fill(); }
+  for (const w of state.wires) drawWire(bg, w, state.selWire === w || (state.wire && state.wire.onWire === w));
+  for (const c of state.comps) {
+    const hr = hover && hover.kind === 'pin' ? { id: hover.c.id, side: hover.side, p: hover.p } : null;
+    const wt = state.wire && state.wire.target;
+    drawComp(bg, c, {
+      sel: state.sel.has(c.id),
+      hoverIn: hr && hr.side === 'in' ? hr : null,
+      hoverOut: hr && hr.side === 'out' ? hr : null,
+      wireTarget: wt && wt.side === 'in' ? wt : null,
+    });
+  }
+  if (state.wire) {
+    const s = state.wire.start, c = byId(s.id);
+    const pt = s.side === 'out' ? outPins(c)[s.p] : inPins(c)[s.p];
+    const to = state.wire.at;
+    const dx = Math.max(24, Math.abs(to.x - pt.x) * .45) * (s.side === 'out' ? 1 : -1);
+    bg.setLineDash([6, 5]); bg.strokeStyle = '#f0c33c'; bg.lineWidth = 2;
+    bg.beginPath(); bg.moveTo(pt.x, pt.y);
+    bg.bezierCurveTo(pt.x + dx, pt.y, to.x - dx, to.y, to.x, to.y); bg.stroke(); bg.setLineDash([]);
+    bg.beginPath(); bg.arc(to.x, to.y, 3.5, 0, 7); bg.fillStyle = '#f0c33c'; bg.fill();
+  }
+  if (marquee) {
+    bg.fillStyle = '#3ddc9718'; bg.strokeStyle = '#3ddc97'; bg.lineWidth = 1;
+    bg.setLineDash([4, 3]);
+    bg.fillRect(marquee.x, marquee.y, marquee.w, marquee.h);
+    bg.strokeRect(marquee.x, marquee.y, marquee.w, marquee.h);
+    bg.setLineDash([]);
+  }
+  bg.restore();
+  drawScope();
+}
+
+const SCOPE_LW = 122, SCOPE_RH = 24;
+let scopeHits = { labels: [], chips: [] };
+const scopeShown = s => { const c = byId(s.cid); return !c || c.props.scope !== false; };
+function drawChips(hid, w, y0) {
+  sg.font = '10px ui-sans-serif,system-ui,"PingFang SC",sans-serif';
+  sg.textAlign = 'left'; sg.textBaseline = 'middle';
+  let x = 8, y = y0;
+  sg.fillStyle = '#6d7a8c'; sg.fillText('已隐藏', x, y);
+  x += sg.measureText('已隐藏').width + 7;
+  for (const [, s] of hid) {
+    const t = s.label + ' ↩';
+    const tw = sg.measureText(t).width;
+    if (x + tw > w - 80) { x = 8; y += 13; }
+    sg.fillStyle = '#8ea0b5'; sg.fillText(t, x, y);
+    scopeHits.chips.push({ x0: x - 3, x1: x + tw + 3, y, cid: s.cid });
+    x += tw + 9;
+  }
+}
+function drawScope() {
+  const r = scopeCv.getBoundingClientRect();
+  scopeHits = { labels: [], chips: [] };
+  sg.setTransform(dpr, 0, 0, dpr, 0, 0);
+  sg.clearRect(0, 0, r.width, r.height);
+  sg.fillStyle = '#0d1117'; sg.fillRect(0, 0, r.width, r.height);
+  const all = [...scope.series.entries()];
+  if (!all.length || !all[0][1].data.length) {
+    sg.fillStyle = '#6d7a8c'; sg.font = '12px ui-sans-serif,system-ui,"PingFang SC",sans-serif';
+    sg.textAlign = 'center'; sg.textBaseline = 'middle';
+    sg.fillText('点「单步」或「运行」后，这里会按节拍记录每个信号的电平；点波形上的信号名可隐藏/恢复该元件', r.width / 2, r.height / 2);
+    return;
+  }
+  const hid = all.filter(kv => !scopeShown(kv[1]));
+  const rows = all.filter(kv => scopeShown(kv[1]));
+  if (!rows.length) {
+    sg.fillStyle = '#6d7a8c'; sg.font = '12px ui-sans-serif,system-ui,"PingFang SC",sans-serif';
+    sg.textAlign = 'center'; sg.textBaseline = 'middle';
+    sg.fillText('所有信号都隐藏了，点名字恢复', r.width / 2, r.height / 2 - 14);
+    sg.textAlign = 'left';
+    drawChips(hid, r.width, r.height / 2 + 12);
+    return;
+  }
+  const LW = SCOPE_LW, RH = SCOPE_RH, win = Math.min(80, rows[0][1].data.length);
+  const x0 = LW + 10, pw = Math.max(30, r.width - x0 - 12), dx = pw / win;
+  const lvl = (v, base, amp) => v === 1 ? base : v === 0 ? base + amp : base + amp / 2;
+  sg.textAlign = 'left'; sg.textBaseline = 'middle';
+  sg.strokeStyle = '#1b2230'; sg.lineWidth = 1;
+  for (let i = 0; i <= win; i += 10) { const x = Math.round(x0 + i * dx) + .5; sg.beginPath(); sg.moveTo(x, 2); sg.lineTo(x, 2 + rows.length * RH); sg.stroke(); }
+  rows.forEach(([key, s], ri) => {
+    const d = s.data.slice(-win);
+    const top = 2 + ri * RH, base = top + 5, amp = 13;
+    if (ri % 2 === 0) { sg.fillStyle = '#11161e'; sg.fillRect(0, top, r.width, RH - 2); }
+    scopeHits.labels.push({ x0: 0, x1: LW, y0: top, y1: top + RH - 2, cid: s.cid });
+    sg.fillStyle = color(d[d.length - 1]);
+    sg.font = '11px ui-monospace,Consolas,monospace';
+    sg.fillText(s.label.length > 16 ? s.label.slice(0, 15) + '…' : s.label, 8, top + RH / 2 - 1);
+    sg.strokeStyle = '#3ddc97'; sg.lineWidth = 1.8; sg.beginPath();
+    sg.moveTo(x0, lvl(d[0], base, amp));
+    for (let i = 0; i < d.length; i++) {
+      const xe = x0 + (i + 1) * dx, y = lvl(d[i], base, amp);
+      sg.lineTo(xe, y);
+      if (i + 1 < d.length && d[i + 1] !== d[i]) sg.lineTo(xe, lvl(d[i + 1], base, amp));
+    }
+    sg.stroke();
+    sg.strokeStyle = '#4d9dff'; sg.lineWidth = 2.6; sg.beginPath();
+    for (let i = 0; i < d.length; i++) {
+      if (d[i] !== X) continue;
+      const xs = x0 + i * dx, xe = x0 + (i + 1) * dx, y = lvl(X, base, amp);
+      if (i > 0 && d[i - 1] !== X) sg.moveTo(xs, lvl(d[i - 1], base, amp));
+      sg.lineTo(xs, y); sg.lineTo(xe, y);
+    }
+    sg.stroke();
+  });
+  const foot = Math.min(r.height - 10, 2 + rows.length * RH + 9);
+  sg.fillStyle = '#6d7a8c'; sg.font = '10px ui-sans-serif,system-ui,"PingFang SC",sans-serif'; sg.textAlign = 'right';
+  sg.fillText('第 ' + state.tick + ' 拍', r.width - 12, foot);
+  if (hid.length) drawChips(hid, r.width, foot);
+}
+
+/* ---------------- 波形开关（按元件） ---------------- */
+function scopeHit(e) {
+  const r = scopeCv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  for (const h of scopeHits.chips) if (x >= h.x0 && x <= h.x1 && Math.abs(y - h.y) < 8) return h;
+  for (const h of scopeHits.labels) if (x >= h.x0 && x <= h.x1 && y >= h.y0 && y <= h.y1) return h;
+  return null;
+}
+function toggleTrace(cid) {
+  const c = byId(cid); if (!c) return;
+  c.props.scope = c.props.scope === false;
+  evaluateAll();
+  toast(c.props.scope === false ? '已隐藏 ' + label(c) + ' 的波形（点波形底部的名字可恢复）' : '已恢复 ' + label(c) + ' 的波形');
+}
+scopeCv.addEventListener('click', e => { const h = scopeHit(e); if (h) toggleTrace(h.cid); });
+scopeCv.addEventListener('mousemove', e => { scopeCv.style.cursor = scopeHit(e) ? 'pointer' : 'default'; });
+
+/* ---------------- HUD / 属性面板 ---------------- */
+const $ = id => document.getElementById(id);
+function renderHud() {
+  $('hTick').textContent = state.tick;
+  $('hN').textContent = state.comps.length;
+  $('hW').textContent = state.wires.length;
+  const st = $('hStat');
+  st.textContent = state.unstable ? '⚠ 未收敛（组合环振荡）' : '稳定';
+  st.className = state.unstable ? 'bad' : 'good';
+}
+// 只在真正输入时暂停刷新（文本框打字、下拉框展开），否则面板上的按钮会把读数冻在旧值
+const panelBusy = () => {
+  const a = document.activeElement;
+  if (!a || !a.closest || !a.closest('#propBody')) return false;
+  if (a.tagName === 'SELECT' || a.tagName === 'TEXTAREA') return true;
+  return a.tagName === 'INPUT' && !/^(checkbox|radio)$/.test(a.type || '');
+};
+function renderProps() {
+  if (panelBusy()) return;
+  const el = $('propBody');
+  const sel = [...state.sel];
+  const fmt = v => v === 1 ? '<span class="v1">1</span>' : v === 0 ? '<span class="v0">0</span>' : '<span class="vX">X</span>';
+  if (state.selWire) {
+    const w = state.selWire, A = byId(w.a.id), B = byId(w.b.id);
+    el.innerHTML = '<div class="kv"><div class="k">连线</div><div class="v">' + (A ? label(A) + '.' + outNames(A)[w.a.p] : '?') +
+      ' → ' + (B ? label(B) + '.' + inNames(B)[w.b.p] : '?') + '</div>' +
+      '<div class="k">当前值</div><div class="v">' + fmt(refValue(w.a)) + '</div></div>' +
+      '<div class="rowline"><button data-a="delwire">删除这条线</button></div>';
+    bindProps(el); return;
+  }
+  if (!sel.length) {
+    el.innerHTML = '<div class="kv">' +
+      '<div class="k">未选中</div><div class="v">点元件编辑参数（含触发器的上升/下降沿），点连线可删除，右键元件或连线直接删</div>' +
+      '<div class="k">电路统计</div><div class="v">' + state.comps.length + ' 个元件 · ' + state.wires.length + ' 根连线 · 第 ' + state.tick + ' 拍</div>' +
+      '<div class="k">求解状态</div><div class="v">' + (state.unstable ? '<span class="v0">未收敛，存在组合反馈环</span>' : '已收敛') + '</div>' +
+      '<div class="k">提示</div><div class="v">开关、时钟引脚在画布上可直接点；未连接的输入是 X</div></div>';
+    return;
+  }
+  if (sel.length > 1) {
+    el.innerHTML = '<div class="kv"><div class="k">多选</div><div class="v">' + sel.length + ' 个元件</div></div>' +
+      '<div class="rowline"><button data-a="del">删除所选</button><button data-a="desel">取消选择</button></div>';
+    bindProps(el); return;
+  }
+  const c = byId(sel[0]);
+  if (!c) { el.textContent = ''; return; }
+  const p = PARTS[c.type], ins = inValues(c);
+  let h = '<div class="badges"><span class="b">' + p.title + '</span><span class="b">' + c.type + '</span>' +
+    (isSeq(c) ? '<span class="b">' + (c.props.edge === 0 ? '下降沿采样' : '上升沿采样') + '</span>' : '') + '</div>';
+  h += '<div class="kv"><div class="k">名称</div><div class="v"><input data-f="label" type="text" value="' + (c.props.label || '').replace(/"/g, '&quot;') + '" placeholder="' + p.tag + c.id + '"></div>';
+  if (c.type === 'SWITCH') h += '<div class="k">状态</div><div class="v"><button data-a="toggle">' + (c.props.state ? '当前 1，切换为 0' : '当前 0，切换为 1') + '</button></div>';
+  if (c.type === 'CLOCK') {
+    h += '<div class="k">模式</div><div class="v"><label style="cursor:pointer"><input data-f="auto" type="checkbox"' + (c.props.auto ? ' checked' : '') + '> 跟随节拍自动翻转</label></div>';
+    if (c.props.auto) h += '<div class="k">分频</div><div class="v">每 <input data-f="div" type="number" min="1" max="32" value="' + (c.props.div || 1) + '"> 拍翻转一次</div>';
+    else h += '<div class="k">状态</div><div class="v"><button data-a="toggle">' + (c.props.state ? '当前 1，切换为 0' : '当前 0，切换为 1') + '</button></div>';
+  }
+  h += '<div class="k">波形</div><div class="v"><label style="cursor:pointer"><input data-f="scope" type="checkbox"' + (c.props.scope === false ? '' : ' checked') +
+    '> 在波形面板显示（也可直接点波形上的信号名切换）</label></div>';
+  if (isSeq(c)) {
+    const fall = c.props.edge === 0;
+    h += '<div class="k">触发沿</div><div class="v"><select data-f="edge">' +
+      '<option value="1"' + (fall ? '' : ' selected') + '>上升沿（0→1）</option>' +
+      '<option value="0"' + (fall ? ' selected' : '') + '>下降沿（1→0）</option></select> 时采样</div>';
+  }
+  if (p.varIn) h += '<div class="k">输入数</div><div class="v"><select data-f="n">' + [2, 3, 4].map(n => '<option value="' + n + '"' + ((c.props.n || p.varIn) === n ? ' selected' : '') + '>' + n + '</option>').join('') + '</select></div>';
+  if (p.varOut) h += '<div class="k">分支数</div><div class="v"><select data-f="m">' + [2, 3, 4, 5, 6].map(n => '<option value="' + n + '"' + ((c.props.m || p.varOut) === n ? ' selected' : '') + '>' + n + '</option>').join('') + '</select> 条支路</div>';
+  h += '</div><div class="kv" style="margin-top:8px">';
+  inNames(c).forEach((n, i) => { h += '<div class="k">输入 ' + n + '</div><div class="v">' + fmt(ins[i]) + (srcOf(c.id, i) ? '' : ' （悬空）') + '</div>'; });
+  outNames(c).forEach((n, i) => { h += '<div class="k">输出 ' + n + '</div><div class="v">' + fmt(c.out[i]) + '</div>'; });
+  if (c.type === 'LED') h += '<div class="k">亮度</div><div class="v">' + fmt(ins[0]) + '</div>';
+  h += '</div><div class="rowline"><button data-a="del">删除元件</button><button data-a="desel">取消选择</button></div>';
+  el.innerHTML = h;
+  bindProps(el);
+}
+function bindProps(el) {
+  el.onclick = e => {
+    const a = e.target.dataset.a;
+    if (!a) return;
+    if (a === 'del' || a === 'delwire') { snapshot(); removeSelected(); evaluateAll(); }
+    if (a === 'desel') { state.sel.clear(); state.selWire = null; renderProps(); draw(); }
+    if (a === 'toggle') { state.sel.forEach(id => { const c = byId(id); if (c && isSrc(c)) c.props.state = c.props.state ? 0 : 1; }); evaluateAll(); }
+  };
+  el.oninput = e => {
+    const f = e.target.dataset.f; if (!f) return;
+    const c = byId([...state.sel][0]); if (!c) return;
+    if (f === 'label') c.props.label = e.target.value;
+    if (f === 'auto') c.props.auto = e.target.checked;
+    if (f === 'div') c.props.div = Math.max(1, Math.min(32, +e.target.value || 1));
+    if (f === 'edge') c.props.edge = +e.target.value;
+    if (f === 'scope') c.props.scope = e.target.checked;
+    if (f === 'n' || f === 'm') { snapshot(); c.props[f] = +e.target.value; c.out = new Array(outCount(c)).fill(0); prunePins(c); }
+    evaluateAll();
+  };
+}
+
+/* ---------------- 结构操作 ---------------- */
+function snapshot() { undoStack.push(serialize()); if (undoStack.length > 60) undoStack.shift(); }
+function overlaps(x, y, w, h, skip) {
+  return state.comps.some(c => {
+    if (c === skip) return false;
+    const b = boxOf(c);
+    return x < b.x + b.w + 10 && x + w > b.x - 10 && y < b.y + b.h + 10 && y + h > b.y - 10;
+  });
+}
+// 新元件落在左上->右下递增的空位上，避免全堆在画布中心互相压住
+function freeSpot(type, cx, cy) {
+  const p = PARTS[type];
+  const probe = { type, x: 0, y: 0, props: { n: p.varIn || 2, m: p.varOut || 2 } };
+  const b = boxOf(probe), w = b.w, h = b.h;
+  let x = Math.round(cx - w / 2), y = Math.round(cy - h / 2);
+  if (!overlaps(x, y, w, h)) return { x, y };
+  const stepX = w + 26, stepY = h + 30;
+  for (let ring = 1; ring <= 5; ring++) {
+    for (let i = -ring; i <= ring; i++) {
+      const cand = [
+        [x + i * stepX, y - ring * stepY], [x + i * stepX, y + ring * stepY],
+        [x - ring * stepX, y + i * stepY], [x + ring * stepX, y + i * stepY],
+      ];
+      for (const [px, py] of cand) if (!overlaps(px, py, w, h)) return { x: px, y: py };
+    }
+  }
+  let bottom = 0;
+  for (const c of state.comps) bottom = Math.max(bottom, c.y + boxOf(c).h);
+  return { x, y: Math.round(bottom + 40) };
+}
+function addComp(type, x, y) {
+  snapshot();
+  const props = {};
+  if (PARTS[type].varIn) props.n = PARTS[type].varIn;
+  if (PARTS[type].varOut) props.m = PARTS[type].varOut;
+  if (PARTS[type].cat === 'seq') props.edge = 1;
+  const probe = mk(type, x, y, props);
+  if (type === 'CLOCK') { probe.props.auto = true; probe.props.div = 1; }
+  const pos = freeSpot(type, x + boxOf(probe).w / 2, y + boxOf(probe).h / 2);
+  probe.x = pos.x; probe.y = pos.y;
+  state.comps.push(probe);
+  state.sel.clear(); state.sel.add(probe.id); state.selWire = null;
+  evaluateAll();
+  return probe;
+}
+function prunePins(c) {
+  state.wires = state.wires.filter(w => {
+    if (w.b.id === c.id && w.b.p >= inCount(c)) return false;
+    if (w.a.id === c.id && w.a.p >= outCount(c)) return false;
+    return true;
+  });
+}
+// 把输入引脚拖到已有连线上：在该处插入分线器，让同一条线分叉出去
+function branchWire(w, inRef) {
+  snapshot();
+  const src = byId(w.a.id);
+  if (src && src.type === 'SPLIT' && outCount(src) < 6) {
+    const port = outCount(src);
+    src.props.m = port + 1;
+    src.out = new Array(port + 1).fill(src.out[0]);
+    state.wires.push({ a: refFrom(src, 'out', port), b: inRef });
+    evaluateAll();
+    toast('已分出一条支路（共 ' + (port + 1) + ' 条）');
+    return;
+  }
+  const pts = wirePts(w);
+  const dst = byId(w.b.id);
+  const mid = pts ? bez(pts, .5) : { x: dst ? dst.x : 0, y: dst ? dst.y : 0 };
+  const pos = freeSpot('SPLIT', mid.x, mid.y);
+  const sp = mk('SPLIT', pos.x, pos.y, { m: 2 });
+  state.comps.push(sp);
+  const oldTarget = w.b;
+  w.b = refFrom(sp, 'in', 0);
+  state.wires.push({ a: refFrom(sp, 'out', 0), b: oldTarget });
+  state.wires.push({ a: refFrom(sp, 'out', 1), b: inRef });
+  state.sel.clear(); state.sel.add(sp.id);
+  evaluateAll();
+  toast('已在线中点插入分线器');
+}
+function removeComps(ids) {
+  state.wires = state.wires.filter(w => {
+    if (!ids.has(w.a.id) && !ids.has(w.b.id)) return true;
+    if (state.selWire === w) state.selWire = null;
+    return false;
+  });
+  state.comps = state.comps.filter(c => !ids.has(c.id));
+  ids.forEach(id => state.sel.delete(id));
+}
+function removeWire(w) { state.wires = state.wires.filter(x => x !== w); if (state.selWire === w) state.selWire = null; }
+function removeSelected() {
+  if (state.selWire) { removeWire(state.selWire); return; }
+  if (state.sel.size) removeComps(new Set(state.sel));
+}
+function refFrom(c, side, p) { return { id: c.id, p, side }; }
+function addWire(a, b) {
+  if (a.side !== 'out' || b.side !== 'in') return false;
+  snapshot();
+  state.wires = state.wires.filter(w => !(w.b.id === b.id && w.b.p === b.p));
+  state.wires.push({ a, b });
+  evaluateAll();
+  return true;
+}
+function centerWorld() {
+  const r = board.getBoundingClientRect();
+  return { x: (r.width / 2 - state.view.x) / state.view.k, y: (r.height / 2 - state.view.y) / state.view.k };
+}
+function fitView() {
+  const r = board.getBoundingClientRect();
+  if (!state.comps.length) { state.view = { x: r.width / 2, y: r.height / 2, k: 1 }; draw(); return; }
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const c of state.comps) { const b = boxOf(c); x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h); }
+  x0 -= 40; y0 -= 40; x1 += 40; y1 += 50;
+  const k = Math.min(1.4, Math.max(.3, Math.min(r.width / (x1 - x0), r.height / (y1 - y0))));
+  state.view = { k, x: (r.width - (x1 - x0) * k) / 2 - x0 * k, y: (r.height - (y1 - y0) * k) / 2 - y0 * k };
+  draw();
+}
+
+/* ---------------- 指针交互 ---------------- */
+let drag = null, marquee = null;
+function toWorld(e) {
+  const r = board.getBoundingClientRect();
+  return { x: (e.clientX - r.left - state.view.x) / state.view.k, y: (e.clientY - r.top - state.view.y) / state.view.k };
+}
+function hitPin(p) {
+  const R = 9 / state.view.k;
+  for (const c of state.comps) {
+    for (const pt of inPins(c)) if (Math.hypot(pt.x - p.x, pt.y - p.y) < R) return { kind: 'pin', c, side: 'in', p: pt.i };
+    for (const pt of outPins(c)) if (Math.hypot(pt.x - p.x, pt.y - p.y) < R) return { kind: 'pin', c, side: 'out', p: pt.i };
+  }
+  return null;
+}
+function hitComp(p) {
+  for (let i = state.comps.length - 1; i >= 0; i--) {
+    const c = state.comps[i], b = boxOf(c);
+    if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) return c;
+  }
+  return null;
+}
+function hitWire(p) {
+  const R = 6 / state.view.k;
+  for (const w of state.wires) {
+    const pts = wirePts(w); if (!pts) continue;
+    for (let i = 1; i <= 24; i++) { const q = bez(pts, i / 24); if (Math.hypot(q.x - p.x, q.y - p.y) < R) return w; }
+  }
+  return null;
+}
+board.addEventListener('pointerdown', e => {
+  if (e.button === 2) return;
+  board.setPointerCapture(e.pointerId);
+  const p = toWorld(e);
+  state.wire = null; marquee = null;
+  if (e.button === 1 || e.altKey) { drag = { mode: 'pan', sx: e.clientX, sy: e.clientY, vx: state.view.x, vy: state.view.y }; return; }
+  const hp = hitPin(p);
+  if (hp && hp.kind === 'pin') {
+    state.wire = { start: refFrom(hp.c, hp.side, hp.p), at: p, to: null, target: null };
+    drag = { mode: 'wire' };
+    return;
+  }
+  const c = hitComp(p);
+  if (c) {
+    if (e.shiftKey) { state.sel.has(c.id) ? state.sel.delete(c.id) : state.sel.add(c.id); }
+    else if (!state.sel.has(c.id)) { state.sel.clear(); state.sel.add(c.id); }
+    state.selWire = null;
+    drag = { mode: 'move', sx: p.x, sy: p.y, moved: false, orig: state.comps.filter(x => state.sel.has(x.id)).map(x => ({ c: x, x: x.x, y: x.y })) };
+    renderProps(); draw();
+    return;
+  }
+  const w = hitWire(p);
+  if (w) { state.selWire = w; state.sel.clear(); renderProps(); draw(); drag = { mode: 'none' }; return; }
+  if (!e.shiftKey) { state.sel.clear(); state.selWire = null; }
+  marquee = { x: p.x, y: p.y, w: 0, h: 0, base: [...state.sel], sx: p.x, sy: p.y };
+  drag = { mode: 'marquee' };
+  renderProps(); draw();
+});
+board.addEventListener('pointermove', e => {
+  const p = toWorld(e);
+  if (state.wire) state.wire.at = p;
+  if (drag && drag.mode === 'pan') {
+    state.view.x = drag.vx + (e.clientX - drag.sx); state.view.y = drag.vy + (e.clientY - drag.sy); draw(); return;
+  }
+  if (drag && drag.mode === 'wire') {
+    const t = hitPin(p);
+    state.wire.target = t && t.side !== state.wire.start.side ? { id: t.c.id, p: t.p, side: t.side } : null;
+    state.wire.onWire = state.wire.target ? null : hitWire(p);
+    draw(); return;
+  }
+  if (drag && drag.mode === 'move') {
+    const dx = p.x - drag.sx, dy = p.y - drag.sy;
+    if (!drag.moved && Math.hypot(dx, dy) * state.view.k > 3) { drag.moved = true; snapshot(); }
+    if (drag.moved) for (const o of drag.orig) { o.c.x = Math.round(o.x + dx); o.c.y = Math.round(o.y + dy); }
+    draw(); return;
+  }
+  if (drag && drag.mode === 'marquee' && marquee) {
+    marquee.x = Math.min(marquee.sx, p.x); marquee.y = Math.min(marquee.sy, p.y);
+    marquee.w = Math.abs(p.x - marquee.sx); marquee.h = Math.abs(p.y - marquee.sy);
+    const set = new Set(marquee.base);
+    for (const c of state.comps) { const b = boxOf(c); if (b.x >= marquee.x && b.y >= marquee.y && b.x + b.w <= marquee.x + marquee.w && b.y + b.h <= marquee.y + marquee.h) set.add(c.id); }
+    state.sel = set; draw(); renderProps(); return;
+  }
+  const c2 = hitComp(p);
+  const hc = hitPin(p) || (c2 ? { kind: 'comp', c: c2 } : null);
+  const sig = h => !h ? '' : h.kind === 'pin' ? 'p' + h.c.id + h.side + h.p : 'c' + h.c.id;
+  board.style.cursor = hc ? (hc.kind === 'pin' ? 'crosshair' : 'move') : (hitWire(p) ? 'pointer' : 'default');
+  if (sig(hc) !== sig(hover)) { hover = hc; draw(); }
+});
+board.addEventListener('pointerup', e => {
+  const p = toWorld(e);
+  if (drag && drag.mode === 'wire' && state.wire) {
+    const t = state.wire.target, s = state.wire.start;
+    if (t) { if (s.side === 'out') addWire(s, t); else addWire(t, s); }
+    else if (state.wire.onWire && s.side === 'in') branchWire(state.wire.onWire, s);
+    else if (state.wire.onWire) toast('输出引脚不能搭到别人的线上，会变成两个输出短路');
+    state.wire = null; draw();
+  }
+  if (drag && drag.mode === 'move' && !drag.moved) {
+    const c = byId([...state.sel][0]);
+    if (c && isSrc(c)) { snapshot(); c.props.state = c.props.state ? 0 : 1; evaluateAll(); }
+  }
+  if (drag && drag.mode === 'marquee') { state.wire = null; draw(); }
+  marquee = null; drag = null;
+});
+board.addEventListener('pointerleave', () => { hover = null; draw(); });
+board.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r = board.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  const k = Math.min(2.2, Math.max(.25, state.view.k * (e.deltaY < 0 ? 1.12 : 0.89)));
+  state.view.x = mx - (mx - state.view.x) * (k / state.view.k);
+  state.view.y = my - (my - state.view.y) * (k / state.view.k);
+  state.view.k = k; draw();
+}, { passive: false });
+// 右键：命中元件就删元件（多选中则整组），命中连线就删连线，Ctrl+Z 可撤销
+board.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  if (state.wire) { state.wire = null; drag = null; draw(); return; }
+  const p = toWorld(e);
+  const c = hitComp(p);
+  if (c) {
+    const group = state.sel.size > 1 && state.sel.has(c.id);
+    const ids = group ? new Set(state.sel) : new Set([c.id]);
+    const what = group ? ids.size + ' 个元件' : label(c);
+    snapshot();
+    removeComps(ids);
+    evaluateAll();
+    toast('已删除 ' + what + '，Ctrl+Z 撤销');
+    return;
+  }
+  const w = hitWire(p);
+  if (w) { snapshot(); removeWire(w); evaluateAll(); toast('已删除这条连线，Ctrl+Z 撤销'); }
+});
+board.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+board.addEventListener('drop', e => {
+  e.preventDefault();
+  const t = e.dataTransfer.getData('text/plain');
+  if (!PARTS[t]) return;
+  const p = toWorld(e), b = boxOf({ type: t, x: 0, y: 0, props: {} });
+  addComp(t, p.x - b.w / 2, p.y - b.h / 2);
+});
+
+/* ---------------- 元件库 ---------------- */
+const pal = $('pal');
+GROUPS.forEach(([gname, list]) => {
+  const h = document.createElement('div'); h.className = 'pgroup'; h.textContent = gname; pal.appendChild(h);
+  const wrap = document.createElement('div'); wrap.className = 'items';
+  list.forEach(t => {
+    const d = document.createElement('div');
+    d.className = 'item'; d.draggable = true; d.title = '单击放置或拖到画布：' + PARTS[t].title;
+    const cv = document.createElement('canvas');
+    d.appendChild(cv);
+    const s = document.createElement('span'); s.textContent = PARTS[t].title; d.appendChild(s);
+    d.onclick = () => { const p = centerWorld(), b = boxOf({ type: t, x: 0, y: 0, props: {} }); addComp(t, p.x - b.w / 2, p.y - b.h / 2); };
+    d.ondragstart = e => e.dataTransfer.setData('text/plain', t);
+    wrap.appendChild(d);
+    requestAnimationFrame(() => {
+      fitCanvasOf(cv);
+      const g = cv.getContext('2d'), r = cv.getBoundingClientRect();
+      const c = mk(t, 4, 2, PARTS[t].varIn ? { n: 2 } : {});
+      if (t === 'SWITCH') c.props.state = 1;
+      if (t === 'CLOCK') { c.props.auto = true; c.props.state = 1; c.out = [1]; }
+      c.out = c.out.map((_, i) => i === 0 ? 1 : 0);
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const b = boxOf(c), s2 = Math.min(1, (r.width - 10) / b.w, (r.height - 8) / b.h);
+      g.translate((r.width - b.w * s2) / 2, (r.height - b.h * s2) / 2); g.scale(s2, s2);
+      drawComp(g, c, {});
+    });
+  });
+  pal.appendChild(wrap);
+});
+function fitCanvasOf(cv) {
+  const r = cv.getBoundingClientRect();
+  cv.width = Math.max(1, Math.round(r.width * (window.devicePixelRatio || 1)));
+  cv.height = Math.max(1, Math.round(r.height * (window.devicePixelRatio || 1)));
+  dpr = window.devicePixelRatio || 1;
+}
+
+/* ---------------- 工具栏 ---------------- */
+function setRun(v) {
+  state.running = v;
+  const b = $('bRun');
+  b.textContent = v ? '⏸ 暂停' : '▶ 运行';
+  b.classList.toggle('on', v);
+}
+$('bRun').onclick = () => setRun(!state.running);
+$('bStep').onclick = () => { setRun(false); advance(); };
+$('bReset').onclick = () => { snapshot(); setRun(false); state.tick = 0; resetScope(); for (const c of state.comps) if (isSeq(c)) { c.out = new Array(outCount(c)).fill(0).map((_, i) => i === 1 ? 1 : 0); c.prevClk = X; } evaluateAll(); };
+$('hz').oninput = e => { state.hz = +e.target.value; $('hzv').textContent = state.hz + ' Hz'; };
+$('bUndo').onclick = () => { if (undoStack.length) { applyState(undoStack.pop()); evaluateAll(); } };
+$('preset').onchange = e => { if (!e.target.value) return; snapshot(); loadPreset(e.target.value); e.target.value = ''; toast('已载入示例：' + e.target.selectedOptions[0].text); };
+$('bSave').onclick = () => { LS.setItem(LSKEY, serialize()); toast('已存到浏览器本地；换设备请用「导出」'); };
+$('bOpen').onclick = () => { const s = LS.getItem(LSKEY); if (!s) return toast('浏览器里还没有存档'); snapshot(); applyState(s); evaluateAll(); fitView(); toast('已载入存档'); };
+$('bExport').onclick = () => {
+  const url = URL.createObjectURL(new Blob([serialize()], { type: 'application/json' }));
+  const a = document.createElement('a'); a.href = url; a.download = 'circuit.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 500);
+};
+$('bImport').onclick = () => $('fileIn').click();
+$('fileIn').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { snapshot(); applyState(await f.text()); evaluateAll(); fitView(); toast('导入成功'); }
+  catch (err) { toast('导入失败：' + err.message); }
+  e.target.value = '';
+};
+$('bClear').onclick = () => { snapshot(); state.comps = []; state.wires = []; state.sel.clear(); state.selWire = null; state.tick = 0; resetScope(); evaluateAll(); };
+$('zIn').onclick = () => zoomBy(1.2);
+$('zOut').onclick = () => zoomBy(1 / 1.2);
+$('zFit').onclick = fitView;
+function zoomBy(f) {
+  const r = board.getBoundingClientRect(), mx = r.width / 2, my = r.height / 2;
+  const k = Math.min(2.2, Math.max(.25, state.view.k * f));
+  state.view.x = mx - (mx - state.view.x) * (k / state.view.k);
+  state.view.y = my - (my - state.view.y) * (k / state.view.k);
+  state.view.k = k; draw();
+}
+document.querySelectorAll('.tabs [data-p]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tabs [data-p]').forEach(x => x.classList.toggle('on', x === b));
+  ['scope', 'prop', 'help'].forEach(k => $('p-' + k).classList.toggle('hide', k !== b.dataset.p));
+  if (b.dataset.p === 'scope') draw();
+  document.body.classList.remove('nomax');
+  $('bMax').textContent = '收起';
+});
+$('bMax').onclick = () => {
+  const c = document.body.classList.toggle('nomax');
+  $('bMax').textContent = c ? '展开' : '收起';
+  fitCanvas(scopeCv); draw();
+};
+$('tipClose').onclick = () => { $('tip').style.display = 'none'; LS.setItem(LSKEY + '.tip', '1'); };
+let toastT = 0;
+function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 1600); }
+
+/* ---------------- 存档与示例 ---------------- */
+const LSKEY = 'digital-lab-v1';
+const LS = (() => {
+  try { localStorage.setItem('.probe', '1'); localStorage.removeItem('.probe'); return localStorage; }
+  catch { return { getItem: () => null, setItem: () => {}, removeItem: () => {} }; }
+})();
+let saveT = 0;
+function markDirty() { clearTimeout(saveT); saveT = setTimeout(() => LS.setItem(LSKEY, serialize()), 700); }
+function serialize() {
+  return JSON.stringify({
+    v: 1, tick: state.tick, nextId: state.nextId,
+    comps: state.comps.map(c => ({ id: c.id, type: c.type, x: c.x, y: c.y, props: c.props })),
+    wires: state.wires,
+  });
+}
+function applyState(json) {
+  const o = typeof json === 'string' ? JSON.parse(json) : json;
+  state.comps = (o.comps || []).map(c => {
+    const p = { ...c, props: c.props || {}, out: [], prevClk: X };
+    p.out = new Array(outCount(p)).fill(0);
+    if (isSeq(p)) p.out = p.out.map(() => 0);
+    return p;
+  });
+  state.wires = (o.wires || []).filter(w => w && w.a && w.b && byId(w.a.id) && byId(w.b.id));
+  state.tick = o.tick || 0;
+  state.nextId = Math.max(o.nextId || 0, ...state.comps.map(c => c.id + 1), 1);
+  state.sel.clear(); state.selWire = null;
+  resetScope();
+  for (const c of state.comps) if (isSeq(c)) c.prevClk = inValues(c)[inCount(c) - 1];
+}
+function W(sa, pa, sb, pb) { return { a: { id: sa.id, p: pa, side: 'out' }, b: { id: sb.id, p: pb, side: 'in' } }; }
+const PRESETS = {
+  divider() {
+    const clk = mk('CLOCK', 120, 150, { auto: true, div: 1 });
+    const ff = mk('DFF', 330, 140, {});
+    const led1 = mk('LED', 560, 110, { label: 'Q' });
+    const led2 = mk('LED', 560, 210, { label: 'Q̄' });
+    ff.props.label = 'T 触发器';
+    return { comps: [clk, ff, led1, led2], wires: [W(clk, 0, ff, 1), W(ff, 1, ff, 0), W(ff, 0, led1, 0), W(ff, 1, led2, 0)] };
+  },
+  srlatch() {
+    const s = mk('SWITCH', 120, 120, { state: 1, label: 'S̄' });
+    const r = mk('SWITCH', 120, 250, { state: 1, label: 'R̄' });
+    const n1 = mk('NAND', 330, 110, { n: 2 });
+    const n2 = mk('NAND', 330, 250, { n: 2 });
+    const l1 = mk('LED', 570, 100, { label: 'Q' });
+    const l2 = mk('LED', 570, 260, { label: 'Q̄' });
+    return { comps: [s, r, n1, n2, l1, l2], wires: [W(s, 0, n1, 0), W(n2, 0, n1, 1), W(n1, 0, n2, 0), W(r, 0, n2, 1), W(n1, 0, l1, 0), W(n2, 0, l2, 0)] };
+  },
+  fulladder() {
+    const a = mk('SWITCH', 100, 110, { state: 1, label: 'A' });
+    const b = mk('SWITCH', 100, 210, { state: 0, label: 'B' });
+    const ci = mk('SWITCH', 100, 330, { state: 0, label: 'Cin' });
+    const x1 = mk('XOR', 300, 130, { n: 2 });
+    const x2 = mk('XOR', 470, 150, { n: 2 });
+    const ad = mk('AND', 300, 270, { n: 2 });
+    const ax = mk('AND', 470, 300, { n: 2 });
+    const or = mk('OR', 650, 300, { n: 2 });
+    const ls = mk('LED', 660, 130, { label: 'Sum' });
+    const lc = mk('LED', 810, 300, { label: 'Cout' });
+    return {
+      comps: [a, b, ci, x1, x2, ad, ax, or, ls, lc],
+      wires: [
+        W(a, 0, x1, 0), W(b, 0, x1, 1), W(x1, 0, x2, 0), W(ci, 0, x2, 1), W(x2, 0, ls, 0),
+        W(a, 0, ad, 0), W(b, 0, ad, 1), W(x1, 0, ax, 0), W(ci, 0, ax, 1),
+        W(ad, 0, or, 0), W(ax, 0, or, 1), W(or, 0, lc, 0),
+      ],
+    };
+  },
+};
+function loadPreset(name) {
+  const built = PRESETS[name]();
+  state.nextId = 1;
+  state.comps = []; state.wires = []; state.tick = 0; resetScope(); state.sel.clear();
+  const idMap = new Map();
+  for (const c of built.comps) { const n = mk(c.type, c.x, c.y, c.props); idMap.set(c.id, n.id); state.comps.push(n); }
+  state.wires = built.wires.map(w => ({ a: { ...w.a, id: idMap.get(w.a.id) }, b: { ...w.b, id: idMap.get(w.b.id) } }));
+  evaluateAll(); fitView();
+}
+
+/* ---------------- 全局事件与启动 ---------------- */
+window.addEventListener('keydown', e => {
+  const typing = /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
+  if (typing) { if (e.key === 'Escape') document.activeElement.blur(); return; }
+  if (e.code === 'Space') { e.preventDefault(); setRun(!state.running); }
+  else if (e.key === 'n' || e.key === 'N') { setRun(false); advance(); }
+  else if (e.key === 'Escape') { state.wire = null; state.sel.clear(); state.selWire = null; marquee = null; drag = null; renderProps(); draw(); }
+  else if (e.key === 'Delete' || e.key === 'Backspace') { snapshot(); removeSelected(); evaluateAll(); }
+  else if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); $('bUndo').click(); }
+});
+window.addEventListener('resize', () => { fitCanvas(board); fitCanvas(scopeCv); draw(); });
+
+let last = 0, acc = 0;
+function loop(ts) {
+  if (state.running) {
+    if (!last) last = ts;
+    acc += ts - last; last = ts;
+    const per = 1000 / state.hz;
+    let guard = 0;
+    while (acc >= per && guard++ < 10) { acc -= per; advance(); }
+  } else { last = 0; acc = 0; }
+  requestAnimationFrame(loop);
+}
+
+fitCanvas(board); fitCanvas(scopeCv);
+const saved = LS.getItem(LSKEY);
+if (saved) { try { applyState(saved); } catch { loadPreset('divider'); } } else loadPreset('divider');
+if (LS.getItem(LSKEY + '.tip')) $('tip').style.display = 'none';
+evaluateAll();
+fitView();
+setRun(true);
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
