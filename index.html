@@ -14,11 +14,12 @@
   }
   .app{
     display:grid;height:100%;
-    grid-template-columns:222px minmax(0,1fr);
+    grid-template-columns:222px minmax(0,1fr) var(--side,400px);
     grid-template-rows:auto minmax(0,1fr) var(--dock,30vh);
-    grid-template-areas:"hd hd" "pl st" "dk dk";
+    grid-template-areas:"hd hd hd" "pl st sd" "dk dk dk";
   }
   body.nomax .app{--dock:38px}
+  body.noside .app{--side:0px}
 
   header{grid-area:hd;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:9px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
   .brand{font-weight:700;letter-spacing:.3px;margin-right:6px;white-space:nowrap}
@@ -69,6 +70,14 @@
   .tabs .spacer{flex:1}
   .pane{flex:1;min-height:0;overflow:auto;padding:8px 12px}
   .pane.hide{display:none}
+
+  section.side{grid-area:sd;display:flex;flex-direction:column;min-width:0;background:var(--panel);border-left:1px solid var(--line)}
+  body.noside section.side{display:none}
+  .sidehd{display:flex;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line);font-size:11px;color:#6d7a8c;white-space:nowrap}
+  .sidehd b{color:#dbe3ee;font-size:13px}
+  .sidehd .spacer{flex:1}
+  .sidehd button{padding:2px 9px;font-size:11px}
+  .sidebody{flex:1;min-height:0;overflow:auto;padding:8px 10px}
   #scope{width:100%;height:100%;display:block}
   .pane#p-scope{padding:6px 8px;display:flex}
   .kv{display:grid;grid-template-columns:88px minmax(0,1fr);gap:6px 10px;align-items:center;font-size:12px;max-width:760px}
@@ -86,10 +95,21 @@
   .help ul{margin:0;padding-left:18px}
   .help kbd{background:#0f141b;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 5px;font:11px ui-monospace,Consolas,monospace;color:#dbe3ee}
   .help code{color:#89bdf7}
+  .tt{border-collapse:collapse;font:11px ui-monospace,Consolas,monospace;margin-top:6px}
+  .tt th,.tt td{border:1px solid #212a37;padding:2px 8px;text-align:center;white-space:nowrap}
+  .tt th{background:#11161e;color:#9fb0c4;font-weight:600}
+  .tt td.in{color:#dbe3ee}
+  .tt tr.cur td{background:#152232}
+  .tt tr.cur th{background:#1d3049;color:#8ef0bd}
+  .ttnote{color:#8b98ab;font-size:12px;margin:6px 0 0;max-width:820px}
+  .ttbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:#8b98ab}
+  .ttbar button.on{color:#8ef0bd;border-color:#2f6b48}
+  .tth{color:#dbe3ee;font-size:13px;margin:10px 0 2px}
   .v0{color:#8b98ab}.v1{color:#8ef0bd}.vX{color:#89bdf7}
   @media (max-width:900px){
-    .app{grid-template-columns:1fr;grid-template-rows:auto auto minmax(0,1fr) var(--dock,30vh);grid-template-areas:"hd" "pl" "st" "dk"}
+    .app{grid-template-columns:1fr;grid-template-rows:auto auto minmax(120px,1fr) auto var(--dock,30vh);grid-template-areas:"hd" "pl" "st" "sd" "dk"}
     aside{border-right:0;border-bottom:1px solid var(--line);max-height:130px}
+    section.side{border-left:0;border-top:1px solid var(--line);max-height:26vh}
     .item{width:76px}.item canvas{width:68px}
   }
 </style>
@@ -113,7 +133,12 @@
         <option value="divider">D 触发器二分频</option>
         <option value="srlatch">NAND 交叉耦合 SR 锁存</option>
         <option value="fulladder">一位全加器</option>
+        <option value="ls90">74LS90 十进制计数</option>
+        <option value="display90">74LS48 + 数码管显示</option>
+        <option value="reg175">74LS175 四位寄存器</option>
+        <option value="reg194">74LS194 移位寄存器</option>
       </select>
+      <button id="bSide" class="on" title="在屏幕右侧显示／隐藏真值表">真值表</button>
     </div>
     <div class="grp">
       <button id="bSave">保存</button>
@@ -145,11 +170,18 @@
       2. 鼠标移到引脚（小圆圈）上按住，拖到另一个引脚就成一条线；把<em>输入</em>引脚拖到<em>已有的线上</em>会插入分线器形成分支，一个输出也能直接接多个输入（扇出）；<br>
       3. 蓝色空心引脚 = 悬空，值是 X（未知）。<b>门的每个输入都连上才会输出 0/1</b>，只连一半时输出必然是 X，这不是坏了；<br>
       4. 开关在画布上点一下就翻转；时钟靠「运行／单步」走拍，底部波形面板记录每一拍；<br>
-      5. <b>右键</b>元件或连线直接删除（Ctrl+Z 撤销）；触发器的采样沿在属性面板里切换上升/下降沿；<br>
-      6. 波形太挤时，点波形面板左列的<b>信号名</b>就把这个元件的波形关掉，点底部「已隐藏 …↩」的名字恢复。
+      5. <b>右键</b>元件或连线直接删除（Ctrl+Z 撤销）；D/JK 触发器的采样沿在属性面板里切换，74 芯片的沿是固定的（LS74 上升沿、LS90 下降沿），引脚上的 <b>↑/↓</b> 就是它看哪个沿；<br>
+      6. 波形太挤时，点波形面板左列的<b>信号名</b>就把这个元件的波形关掉，点底部「已隐藏 …↩」的名字恢复；<br>
+      7. 想看数字：<b>8421 数显</b>直接吃四路 8421 码，<b>数码管</b>接 74LS48 的 a~g；<b>74LS175</b> 按一下手动时钟锁存四个开关，<b>74LS194</b> 用 S0/S1 选保持/右移/左移/加载；<br>
+      8. 屏幕<b>右侧</b>的「真值表」面板：只选中一个元件就列它自己的表（门和译码器穷举所有输入，触发器/寄存器给功能表，数码管给段码表）；切到「整个电路」则按当前开关与手动时钟穷举，绿底那一行就是眼下的输入组合。不想看时点面板右上「收起」或顶栏「真值表」按钮，画布马上变宽。
       <br><button id="tipClose">知道了</button>
     </div>
   </main>
+
+  <section class="side" id="side">
+    <div class="sidehd"><b>真值表</b><span>随仿真刷新</span><span class="spacer"></span><button id="bSideHide" title="隐藏右侧面板，画布变宽（顶栏「真值表」可再打开）">收起</button></div>
+    <div class="sidebody"><div id="truthBody"></div></div>
+  </section>
 
   <section class="dock">
     <div class="tabs">
@@ -170,6 +202,19 @@
           <li><b>时序</b>：D 触发器、JK 触发器，默认在时钟<em>上升沿</em>（0→1）采样，属性面板可改成<em>下降沿</em>（1→0）；画布上 CLK 引脚标着 <b>↑</b> 或 <b>↓</b>，一眼能看出这台触发器看哪个沿。把 Q̄ 接回 D 就构成二分频。</li>
           <li>沿是相对「上一拍」判断的：只有当时钟引脚的电平从 0 变 1（或 1 变 0）那一拍才写入 D/J/K，其它拍保持原值，所以手动时钟要先让它翻转一次。</li>
           <li><b>布线</b>：分线器，1 入 n 出（2–6），把一条信号原样分成多份；属性面板里可调分支数。</li>
+          <li><b>显示</b>：指示灯（输入为 1 时点亮）、<b>七段数码管</b>（a~g 七个段码脚，高电平点亮，接 74LS48 的输出就能显示数字）、<b>8421 数显</b>（A/B/C/D 四位码直接显示 0~9 与 A、b、C、d、E、F，<em>自带译码</em>，不用另加芯片；有悬空脚时显示 <b>?</b>）。</li>
+          <li><b>74 芯片</b>（按<em>整片</em>建模，一个元件就是一块芯片，引脚名与真芯片一致）：
+            <ul>
+              <li><b>74LS86</b> 四异或：8 入 4 出，1Y=1A⊕1B、2Y=2A⊕2B……一片顶四个异或门。</li>
+              <li><b>74LS125</b> 四三态缓冲：每路一个数据脚 A 和一个<em>低有效</em>使能脚 Ḡ。Ḡ=0 时 Y=A；Ḡ=1 时输出<b>高阻</b>，显示为蓝色 X，相当于这根线没接。</li>
+              <li><b>74LS74</b> 双 D 触发器：1CP/2CP 两个时钟脚（固定<em>上升沿</em>，两路互不影响），另有 R̄D/S̄D 异步端——R̄D=0 立即把 1Q 清 0、S̄D=0 立即置 1，<em>不用等时钟沿</em>；两个一起为 0 时 Q 与 Q̄ 都是 1（真芯片就是这样）。</li>
+              <li><b>74LS90</b> 二-五-十进制计数：CPA 驱动二分频（QA），CPB 驱动五分频（QD/QC/QB），两个脚都是<em>下降沿</em>有效。<b>QA 接 CPB、时钟进 CPA</b> 就是 8421 十进制计数 0~9；只接 CPA 是 ÷2，只接 CPB 是 ÷5。R0(1)=R0(2)=1 清 0，R9(1)=R9(2)=1 置 9，优先级高于计数。输出脚顺序是 QA、QD、QC、QB，权重依次 1、2、4、8。</li>
+              <li><b>74LS48</b> BCD 译码驱动七段：A(1)/B(2)/C(4)/D(8) 四个 8421 码输入，输出 a~g 七个段码，直接接<em>七段数码管</em>的同名脚就显示数字。输入 10~15 时七段全灭（真芯片的消隐）；任一输入悬空则输出全为 X。<em>不建模</em> LT/RBI/BI 这几个测试与消隐端。</li>
+              <li><b>74LS175</b> 四位并行寄存器：D0~D3 四路数据，CP（固定<em>上升沿</em>）一来就同时锁进 Q0~Q3；没有沿时保持不变。MR̄=0 <em>不等时钟</em>立刻四路全清 0。想做「按一次存四个开关」，把 CLK 设成手动模式，点一下时钟翻转即产生沿。</li>
+              <li><b>74LS194</b> 四位双向移位寄存器：S0/S1 选模式——00 保持、01 右移（DSR→Q0→Q1→Q2→Q3）、10 左移（DSL→Q3→Q2→Q1→Q0）、11 并行加载 I0~I3。CP 固定<em>上升沿</em>，CR̄=0 立刻全清 0。S0/S1 接两个开关、DSR/DSL 各接一个开关，就能看到 1 在四个指示灯之间来回跑。</li>
+            </ul>
+          </li>
+          <li>示例电路下拉里：「74LS90 十进制计数」是时钟 + 一片 LS90 + 四个指示灯；「74LS48 + 数码管显示」再加 8421 数显和一片 LS48 驱动七段；「74LS175 四位寄存器」四个开关喂数据、时钟设成 ÷2，改完开关要等下一个上升沿才进 Q；「74LS194 移位寄存器」预置 S1S0=11 先载入 1000，把 S1 拨回 0（=01）就能看着那个 1 往高位跑。</li>
         </ul>
         <h4>仿真规则</h4>
         <ul>
@@ -177,6 +222,16 @@
           <li>与/或门有空传：只要有一个输入是 0，与门输出就是 0，即使别的输入悬空。</li>
           <li>组合反馈（如两个与非门交叉耦合）按不动点迭代求稳态；若 64 轮仍不收敛，HUD 会标红提示<b>振荡</b>，此时输出处于逐轮翻转的伪振荡状态，可用它近似看环振。</li>
           <li>触发器的复位/未连接输入按 0 处理，不建模亚稳态。</li>
+          <li>数码管、8421 数显、指示灯都是<em>纯接收</em>元件（没有输出脚），只做显示不参与求解；波形面板里列的是它们的输入。</li>
+          <li>时序元件按<em>引脚</em>记电平，所以一片芯片可以有多个时钟脚、各自的沿（LS74 两个上升沿、LS90 两个下降沿）。一拍内若某个输出又触发了另一片（例如 LS90 的 QA 接到自己的 CPB），内核会再采样一轮直到不再变化，最多 6 轮，所以纹波进位不会漏数。</li>
+        </ul>
+        <h4>真值表面板</h4>
+        <ul>
+          <li>真值表放在屏幕<em>右侧</em>的独立面板里（顶栏「真值表」按钮或面板右上「收起」随时开关，收起后画布占满宽度）。面板顶上两个按钮切两种模式：<b>选中元件</b>（只在正好选中一个元件时有意义）和<b>整个电路</b>。自动模式下选中一个元件就只看它自己的表，否则看整个电路。</li>
+          <li><b>选中元件</b>：门、分线器、二选一、74LS86/125/48 这类<em>组合</em>元件按输入穷举自动生成（最多穷举 6 个输入，多出来的按当前电平）；最左边一列是最高位。触发器、寄存器、计数器给的是<em>功能表</em>（哪个沿做什么、异步端优先），数码管给段码表、8421 数显给译码表，因为这些元件的输出还取决于历史状态。</li>
+          <li><b>整个电路</b>：把电路里的<em>开关</em>和<em>手动模式的时钟</em>当输入（自动时钟跟着节拍走，不算输入），n 个输入就列 2ⁿ 行；输出列依次是各元件的输出脚，指示灯列写「亮/灭」，数码管与数显列直接写它显示的字形，最多显示 14 列。</li>
+          <li>绿底那一行是<em>当前输入组合</em>所在的行，行末标「当前」。有输入脚悬空（X）时不高亮，因为那一行本来就不在 0/1 的穷举里。</li>
+          <li>表是每次仿真后按当前电路<em>现算</em>的：改连线、拨开关、走一拍都会自动刷新；生成时会临时改动输入电平，算完立刻还原，所以不会留下副作用。时序元件在整电路表里保持现在锁住的状态，不会在表里逐个沿展开。</li>
         </ul>
         <h4>快捷键</h4>
         <ul>
@@ -214,18 +269,40 @@ const vAND = a => a.some(v => v === 0) ? 0 : a.every(v => v === 1) ? 1 : X;
 const vOR  = a => a.some(v => v === 1) ? 1 : a.every(v => v === 0) ? 0 : X;
 const vNOT = v => isX(v) ? X : 1 - v;
 const vXOR = a => a.some(isX) ? X : a.reduce((p, v) => p ^ v, 0);
+const asyncCtl = (p, i, c) => p.async ? p.async(i, c) : null;
+const CLK_UP = '\u2191', CLK_DOWN = '\u2193';
+const SEG = 'abcdefg';
+const SEGMAP = {
+  '0': 'abcdef', '1': 'bc', '2': 'abdeg', '3': 'abcdg', '4': 'bcfg', '5': 'acdfg',
+  '6': 'acdefg', '7': 'abc', '8': 'abcdefg', '9': 'abcdfg',
+  A: 'abcefg', b: 'cdefg', C: 'cdef', d: 'bcdeg', E: 'adefg', F: 'aefg', '-': 'g',
+};
+const segsOf = ch => SEGMAP[ch] || '';
+const hexChar = v => '0123456789AbCdEF'[v];
 
 const CATS = {
   src:  { band: '#3d7ea6' },
   sink: { band: '#a3743f' },
   gate: { band: '#3f4a5e' },
   seq:  { band: '#6c53a8' },
+  chip: { band: '#2f6f63' },
 };
+
+const bcdBits = v => [v & 1, (v >> 1) & 1, (v >> 2) & 1, (v >> 3) & 1];
+const latch = (o, q, d) => { o[q] = d === 1 ? 1 : 0; o[q + 1] = 1 - o[q]; };
+const w4 = i => i[0] + i[1] * 2 + i[2] * 4 + i[3] * 8;
+const segOut = ch => SEG.split('').map(k => segsOf(ch).includes(k) ? 1 : 0);
 
 const PARTS = {
   SWITCH: { tag: 'SW',   title: '开关',     cat: 'src',  outs: ['O'],            fn: (i, c) => [c.props.state ? 1 : 0] },
   CLOCK:  { tag: 'CLK',  title: '时钟',     cat: 'src',  outs: ['CLK'],          fn: (i, c) => [clockValue(c)] },
   LED:    { tag: 'LED',  title: '指示灯',   cat: 'sink', ins: ['A'],   outs: [],  fn: () => [] },
+  SEV:    { tag: '数码管', title: '七段数码管', cat: 'sink',
+            ins: ['a', 'b', 'c', 'd', 'e', 'f', 'g'], outs: [], fn: () => [],
+            hint: '段码输入，高电平点亮；接 74LS48 的输出 a~g 即可显示数字' },
+  NUM:    { tag: '数显', title: '8421 数显', cat: 'sink',
+            ins: ['A(1)', 'B(2)', 'C(4)', 'D(8)'], outs: [], fn: () => [],
+            hint: '直接吃 8421 四位码（自带译码），A=权重 1、D=权重 8；显示 0~9 与 A、b、C、d、E、F（七段画不出大写 B/D，按真数码管习惯用小写），有悬空脚显示 ?' },
   AND:    { tag: 'AND',  title: '与门',     cat: 'gate', varIn: 2, outs: ['Y'], fn: i => [vAND(i)] },
   OR:     { tag: 'OR',   title: '或门',     cat: 'gate', varIn: 2, outs: ['Y'], fn: i => [vOR(i)] },
   NOT:    { tag: 'NOT',  title: '非门',     cat: 'gate', ins: ['A'],   outs: ['Y'], fn: i => [vNOT(i[0])] },
@@ -238,14 +315,86 @@ const PARTS = {
             fn: i => [isX(i[2]) ? X : i[2] === 0 ? i[0] : i[1]] },
   SPLIT:  { tag: '分',   title: '分线器',   cat: 'gate', ins: ['A'], varOut: 3,
             fn: (i, c) => new Array(outCount(c)).fill(i[0]) },
-  DFF:    { tag: 'D',    title: 'D 触发器', cat: 'seq',  ins: ['D', 'CLK'],  outs: ['Q', 'Q̄'], fn: () => [] },
-  JKFF:   { tag: 'J/K',  title: 'JK 触发器', cat: 'seq', ins: ['J', 'K', 'CLK'], outs: ['Q', 'Q̄'], fn: () => [] },
+  DFF:    { tag: 'D',    title: 'D 触发器', cat: 'seq',  ins: ['D', 'CLK'],  outs: ['Q', 'Q̄'],
+            init: () => [0, 1], step: i => { const o = [0, 1]; latch(o, 0, i[0]); return o; } },
+  JKFF:   { tag: 'J/K',  title: 'JK 触发器', cat: 'seq', ins: ['J', 'K', 'CLK'], outs: ['Q', 'Q̄'],
+            init: () => [0, 1],
+            step: (i, c) => {
+              let q = isX(c.out[0]) ? 0 : c.out[0];
+              const j = i[0], k = i[1];
+              if (isX(j) || isX(k)) q = X;
+              else if (j === 1 && k === 1) q = 1 - q;
+              else if (j === 1) q = 1;
+              else if (k === 1) q = 0;
+              if (isX(q)) q = 0;
+              return [q, vNOT(q)];
+            } },
+  LS86:   { tag: 'LS86', title: '74LS86 四异或', cat: 'chip',
+            ins: ['1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B'], outs: ['1Y', '2Y', '3Y', '4Y'],
+            fn: i => [0, 1, 2, 3].map(u => vXOR([i[u * 2], i[u * 2 + 1]])) },
+  LS125:  { tag: 'LS125', title: '74LS125 四缓冲', cat: 'chip',
+            ins: ['1A', '1Ḡ', '2A', '2Ḡ', '3A', '3Ḡ', '4A', '4Ḡ'], outs: ['1Y', '2Y', '3Y', '4Y'],
+            hint: 'Ḡ=0 时 Y=A；Ḡ=1 时输出高阻（显示为蓝色 X，相当于没接线）',
+            fn: i => [0, 1, 2, 3].map(u => i[u * 2 + 1] === 0 ? i[u * 2] : X) },
+  LS74:   { tag: 'LS74', title: '74LS74 双D触发', cat: 'chip',
+            ins: ['1D', '1CP', '1R̄D', '1S̄D', '2D', '2CP', '2R̄D', '2S̄D'], outs: ['1Q', '1Q̄', '2Q', '2Q̄'],
+            clk: [1, 5], clkEdge: 'rise', init: () => [0, 1, 0, 1],
+            hint: 'R̄D=0 清 0、S̄D=0 置 1（低电平有效，两路独立）；两者同为 0 时 Q 与 Q̄ 都是 1',
+            step: (i, c, f) => { const o = c.out.slice(); if (f[0]) latch(o, 0, i[0]); if (f[1]) latch(o, 2, i[4]); return o; },
+            async: (i, c) => {
+              let o = null;
+              for (const u of [0, 1]) {
+                const r = i[u * 4 + 2], s = i[u * 4 + 3];
+                if (r !== 0 && s !== 0) continue;
+                o = o || c.out.slice();
+                o[u * 2] = s === 0 ? 1 : 0;
+                o[u * 2 + 1] = r === 0 ? 1 : 0;
+              }
+              return o;
+            } },
+  LS90:   { tag: 'LS90', title: '74LS90 二-五-十进制', cat: 'chip',
+            ins: ['R0(1)', 'R0(2)', 'CPA', 'R9(1)', 'R9(2)', 'CPB'], outs: ['QA', 'QD', 'QC', 'QB'],
+            clk: [2, 5], clkEdge: 'fall', init: () => [0, 0, 0, 0],
+            hint: 'R0(1)=R0(2)=1 清 0；R9(1)=R9(2)=1 置 9（高电平有效，压过计数）。QA 接 CPB、时钟进 CPA 即十进制 0~9',
+            step: (i, c, f) => {
+              const bit = v => v === 1 ? 1 : 0;
+              const a = bit(c.out[0]), m = bit(c.out[1]) + bit(c.out[2]) * 2 + bit(c.out[3]) * 4;
+              return bcdBits((f[0] ? 1 - a : a) + 2 * (f[1] ? (m + 1) % 5 : m));
+            },
+            async: (i, c) => i[0] === 1 && i[1] === 1 ? [0, 0, 0, 0]
+              : i[3] === 1 && i[4] === 1 ? bcdBits(9) : null },
+  LS48:   { tag: 'LS48', title: '74LS48 七段译码', cat: 'chip',
+            ins: ['A(1)', 'B(2)', 'C(4)', 'D(8)'], outs: ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
+            hint: '把 8421 码译成七段段码，高电平有效，输出脚序 a~g 与数码管一一对应。输入 10~15 时全消隐；不建模 LT/RBI/BI 消隐端',
+            fn: i => i.some(isX) ? new Array(7).fill(X)
+              : w4(i) > 9 ? new Array(7).fill(0) : segOut(hexChar(w4(i))) },
+  LS175:  { tag: 'LS175', title: '74LS175 寄存器', cat: 'chip',
+            ins: ['MR̄', 'CP', 'D0', 'D1', 'D2', 'D3'], outs: ['Q0', 'Q1', 'Q2', 'Q3'],
+            clk: [1], clkEdge: 'rise', init: () => [0, 0, 0, 0],
+            hint: 'CP 上升沿把 D0~D3 一次打进 Q0~Q3，没有沿时保持住；MR̄=0 立即清零。要「先设数据、再走一拍」才看得见寄存',
+            step: (i, c, f) => f[0] ? i.slice(2, 6).map(v => v === 1 ? 1 : 0) : c.out.slice(),
+            async: (i, c) => i[0] === 0 ? [0, 0, 0, 0] : null },
+  LS194:  { tag: 'LS194', title: '74LS194 移位寄存器', cat: 'chip',
+            ins: ['CR̄', 'S0', 'S1', 'DSR', 'DSL', 'CP', 'I0', 'I1', 'I2', 'I3'],
+            outs: ['Q0', 'Q1', 'Q2', 'Q3'],
+            clk: [5], clkEdge: 'rise', init: () => [0, 0, 0, 0],
+            hint: 'CP 上升沿按 S1S0 动作：00 保持、01 右移（DSR→Q0→Q1→Q2→Q3）、10 左移（DSL→Q3→Q2→Q1→Q0）、11 并行置入 I0~I3；CR̄=0 立即清零',
+            step: (i, c, f) => {
+              const bit = v => v === 1 ? 1 : 0, q = c.out.map(bit);
+              if (!f[0]) return c.out.slice();
+              const mode = bit(i[1]) + bit(i[2]) * 2;
+              if (mode === 1) return [bit(i[3]), q[0], q[1], q[2]];
+              if (mode === 2) return [q[1], q[2], q[3], bit(i[4])];
+              return mode === 3 ? i.slice(6, 10).map(bit) : c.out.slice();
+            },
+            async: (i, c) => i[0] === 0 ? [0, 0, 0, 0] : null },
 };
 const GROUPS = [
   ['输入', ['SWITCH', 'CLOCK']],
-  ['输出', ['LED']],
+  ['输出', ['LED', 'SEV', 'NUM']],
   ['门电路', ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR', 'XNOR', 'BUF', 'MUX']],
   ['时序', ['DFF', 'JKFF']],
+  ['74 芯片', ['LS86', 'LS125', 'LS74', 'LS90', 'LS48', 'LS175', 'LS194']],
   ['布线', ['SPLIT']],
 ];
 const PIN_NAMES = ['A', 'B', 'C', 'D'];
@@ -261,16 +410,21 @@ const undoStack = [];
 let dpr = 1;
 
 /* ---------------- 元件与几何 ---------------- */
-const isSeq = c => PARTS[c.type].cat === 'seq';
+const isSeq = c => !!PARTS[c.type].step;
 const isSrc = c => PARTS[c.type].cat === 'src';
 function inCount(c) { const p = PARTS[c.type]; return p.varIn ? Math.max(1, Math.min(4, c.props.n || p.varIn)) : (p.ins ? p.ins.length : 0); }
 function outCount(c) { const p = PARTS[c.type]; return p.varOut ? Math.max(1, Math.min(6, c.props.m || p.varOut)) : (p.outs ? p.outs.length : 0); }
 function inNames(c) { const p = PARTS[c.type]; return p.varIn ? PIN_NAMES.slice(0, inCount(c)) : (p.ins || []); }
 function outNames(c) { const p = PARTS[c.type]; return p.varOut ? SPLIT_OUT.slice(0, outCount(c)) : (p.outs || []); }
+const initOuts = c => { const p = PARTS[c.type]; return p.init ? p.init() : new Array(outCount(c)).fill(0); };
+const clkIdx = c => PARTS[c.type].clk || [inCount(c) - 1];
+const edgeOf = c => { const p = PARTS[c.type]; return p.clkEdge || (c.props.edge === 0 ? 'fall' : 'rise'); };
 const BW = 104;
+const DISPW = 126;
 function boxOf(c) {
   const n = Math.max(inCount(c), outCount(c), 1);
-  return { x: c.x, y: c.y, w: c.type === 'LED' ? 74 : c.type === 'CLOCK' ? 92 : BW, h: 24 * n + 26 };
+  const wide = c.type === 'SEV' || c.type === 'NUM';
+  return { x: c.x, y: c.y, w: wide ? DISPW : c.type === 'LED' ? 74 : c.type === 'CLOCK' ? 92 : BW, h: 24 * n + 26 };
 }
 function inPins(c) { const b = boxOf(c), n = inCount(c), r = []; for (let i = 0; i < n; i++) r.push({ x: b.x, y: b.y + b.h * (i + 1) / (n + 1), i }); return r; }
 function outPins(c) { const b = boxOf(c), n = outCount(c), r = []; for (let i = 0; i < n; i++) r.push({ x: b.x + b.w, y: b.y + b.h * (i + 1) / (n + 1), i }); return r; }
@@ -279,8 +433,8 @@ const label = c => c.props.label || (PARTS[c.type].tag + c.id);
 
 function mk(type, x, y, props = {}) {
   const p = { id: state.nextId++, type, x: Math.round(x), y: Math.round(y), props: { ...props } };
-  p.out = new Array(outCount(p)).fill(0);
-  p.prevClk = X;
+  p.out = initOuts(p);
+  p.prevClk = new Array(inCount(p)).fill(X);
   return p;
 }
 
@@ -293,7 +447,10 @@ function srcOf(id, p) { return state.wires.find(w => w.b.id === id && w.b.p === 
 function refValue(ref) { const c = byId(ref.id); if (!c) return X; const v = c.out[ref.p]; return v === undefined ? X : v; }
 function inValues(c) {
   const r = [];
-  for (let i = 0; i < inCount(c); i++) { const s = srcOf(c.id, i); r.push(s ? refValue(s.a) : X); }
+  for (let i = 0; i < inCount(c); i++) {
+    if (c.pinFix && c.pinFix[i] !== undefined) { r.push(c.pinFix[i]); continue; }
+    const s = srcOf(c.id, i); r.push(s ? refValue(s.a) : X);
+  }
   return r;
 }
 const sameVals = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
@@ -313,31 +470,26 @@ function settle() {
 }
 
 function capture() {
+  let changed = false;
   for (const c of state.comps) {
     if (!isSeq(c)) continue;
-    const ins = inValues(c);
-    const ci = inCount(c) - 1;
-    const clk = ins[ci], prev = c.prevClk;
-    const fired = c.props.edge === 0 ? prev === 1 && clk === 0 : prev === 0 && clk === 1;
-    if (fired) {
-      let q = c.out[0]; if (isX(q)) q = 0;
-      if (c.type === 'DFF') q = ins[0];
-      else {
-        const j = ins[0], k = ins[1];
-        if (isX(j) || isX(k)) q = X;
-        else if (j === 1 && k === 1) q = 1 - q;
-        else if (j === 1) q = 1;
-        else if (k === 1) q = 0;
-      }
-      if (isX(q)) q = 0;
-      c.out = [q, vNOT(q)];
-    }
-    c.prevClk = clk;
+    const p = PARTS[c.type], ins = inValues(c), idx = clkIdx(c), fall = edgeOf(c) === 'fall';
+    const fired = idx.map(i => fall ? c.prevClk[i] === 1 && ins[i] === 0 : c.prevClk[i] === 0 && ins[i] === 1);
+    for (const i of idx) c.prevClk[i] = ins[i];
+    let out = fired.some(Boolean) ? p.step(ins, c, fired) : null;
+    const a = asyncCtl(p, ins, c);
+    if (a) out = a;
+    if (out && !sameVals(c.out, out)) { c.out = out; changed = true; }
   }
+  return changed;
 }
 
 function evaluateAll() {
-  settle(); capture(); settle(); pushFrame(); renderHud(); renderProps(); draw(); markDirty();
+  settle();
+  // 一个节拍内可能要反复采样：LS90 之类把 QA 接到另一个时钟脚的纹波进位，
+  // 只有再多跑一轮才能把下一级数出来，所以这里迭代到不再变化。
+  for (let pass = 0; pass < 6; pass++) { if (!capture()) break; settle(); }
+  pushFrame(); renderHud(); renderProps(); draw(); markDirty();
 }
 function advance() { state.tick++; evaluateAll(); }
 
@@ -347,7 +499,7 @@ function signalRows() {
   for (const c of state.comps) {
     const n = outCount(c);
     if (n === 0) {
-      if (inCount(c) > 0) rows.push({ key: 'in' + c.id, label: label(c) + '.IN', cid: c.id, get: () => inValues(c)[0] });
+      if (inCount(c) > 0) rows.push({ key: 'in' + c.id, label: label(c) + '.IN' + (inCount(c) > 1 ? '(' + inNames(c)[0] + ')' : ''), cid: c.id, get: () => inValues(c)[0] });
     } else {
       for (let i = 0; i < n; i++) rows.push({ key: c.id + '.' + i, label: label(c) + '.' + outNames(c)[i], cid: c.id, get: () => c.out[i] });
     }
@@ -420,6 +572,37 @@ function pinDot(g, pt, v, hot) {
   g.fill();
   g.lineWidth = 1.7; g.strokeStyle = hot ? '#f0c33c' : color(v); g.stroke();
 }
+function drawDigit(g, cx, cy, W, H, lit, mark) {
+  const t = Math.max(2.2, H * 0.085), hw = W / 2, hh = H / 2, k = t * 0.85;
+  const segs = [
+    [[cx - hw + k, cy - hh], [cx + hw - k, cy - hh]],
+    [[cx + hw, cy - hh + k], [cx + hw, cy - k]],
+    [[cx + hw, cy + k], [cx + hw, cy + hh - k]],
+    [[cx - hw + k, cy + hh], [cx + hw - k, cy + hh]],
+    [[cx - hw, cy + k], [cx - hw, cy + hh - k]],
+    [[cx - hw, cy - hh + k], [cx - hw, cy - k]],
+    [[cx - hw + k, cy], [cx + hw - k, cy]],
+  ];
+  g.lineCap = 'round'; g.lineWidth = t;
+  segs.forEach((s, i) => {
+    g.beginPath(); g.moveTo(s[0][0], s[0][1]); g.lineTo(s[1][0], s[1][1]);
+    g.strokeStyle = lit.includes(SEG[i]) ? '#3ddc97' : '#232b36';
+    g.stroke();
+  });
+  if (mark) {
+    g.lineCap = 'butt';
+    g.fillStyle = '#4d9dff'; g.font = '600 ' + Math.round(H * 0.45) + 'px ui-sans-serif,system-ui,sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(mark, cx, cy + 1);
+  }
+}
+function dispState(c) {
+  const iv = inValues(c);
+  if (c.type === 'SEV') return { lit: SEG.split('').filter((s, i) => iv[i] === 1).join(''), mark: '' };
+  if (iv.some(isX)) return { lit: '', mark: '?' };
+  const v = w4(iv);
+  return { lit: segsOf(hexChar(v)), mark: '', value: v };
+}
 function drawComp(g, c, opt = {}) {
   const p = PARTS[c.type], b = boxOf(c), k = state.view.k;
   roundRect(g, b.x, b.y, b.w, b.h, 9);
@@ -433,6 +616,16 @@ function drawComp(g, c, opt = {}) {
     g.fillStyle = lit ? '#3ddc97' : '#242c38'; g.fill();
     if (lit) { g.shadowColor = '#3ddc97'; g.shadowBlur = 16; g.fill(); g.shadowBlur = 0; }
     g.strokeStyle = '#3a4658'; g.lineWidth = 1.4; g.stroke();
+  }
+  if (c.type === 'SEV' || c.type === 'NUM') {
+    const st = dispState(c);
+    const H = Math.min(b.h - 46, 96), dx = b.x + b.w / 2 + 12;
+    drawDigit(g, dx, b.y + b.h / 2 + 5, H * 0.5, H, st.lit, st.mark);
+    if (c.type === 'NUM' && st.mark === '') {
+      g.fillStyle = '#8ea0b5'; g.font = '10px ui-monospace,Consolas,monospace';
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText('8421=' + st.value, dx, b.y + b.h - 14);
+    }
   }
   if (c.type === 'SWITCH') {
     const on = !!c.props.state, px = b.x + b.w / 2;
@@ -454,7 +647,7 @@ function drawComp(g, c, opt = {}) {
   }
   g.restore();
   g.lineWidth = opt.sel ? 2 : 1.2;
-  g.strokeStyle = opt.sel ? '#3ddc97' : p.cat === 'seq' ? '#54406f' : '#2a3444';
+  g.strokeStyle = opt.sel ? '#3ddc97' : isSeq(c) ? '#54406f' : p.cat === 'chip' ? '#2f6f63' : '#2a3444';
   roundRect(g, b.x, b.y, b.w, b.h, 9); g.stroke();
 
   g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -468,9 +661,10 @@ function drawComp(g, c, opt = {}) {
     g.font = '9px ui-monospace,Consolas,monospace'; g.fillStyle = '#8ea0b5'; g.textBaseline = 'middle';
     g.textAlign = 'left';
     const names = inNames(c);
+    const arrows = {};
+    if (isSeq(c)) for (const i of clkIdx(c)) arrows[i] = edgeOf(c) === 'fall' ? CLK_DOWN : CLK_UP;
     inPins(c).forEach((pt, i) => {
-      const clkPin = p.cat === 'seq' && i === names.length - 1;
-      g.fillText(names[i] + (clkPin ? (c.props.edge === 0 ? '↓' : '↑') : ''), pt.x + 7, pt.y);
+      g.fillText(names[i] + (arrows[i] || ''), pt.x + 7, pt.y);
     });
     g.textAlign = 'right';
     outNames(c).forEach((n, i) => { const pt = outPins(c)[i]; g.fillText(n, pt.x - 7, pt.y); });
@@ -636,7 +830,8 @@ const panelBusy = () => {
   if (a.tagName === 'SELECT' || a.tagName === 'TEXTAREA') return true;
   return a.tagName === 'INPUT' && !/^(checkbox|radio)$/.test(a.type || '');
 };
-function renderProps() {
+function renderProps() { renderPropsBody(); renderTruth(); }
+function renderPropsBody() {
   if (panelBusy()) return;
   const el = $('propBody');
   const sel = [...state.sel];
@@ -665,8 +860,10 @@ function renderProps() {
   const c = byId(sel[0]);
   if (!c) { el.textContent = ''; return; }
   const p = PARTS[c.type], ins = inValues(c);
+  const clkPins = isSeq(c) ? clkIdx(c).map(i => inNames(c)[i]).filter(Boolean).join('/') : '';
+  const fall = edgeOf(c) === 'fall';
   let h = '<div class="badges"><span class="b">' + p.title + '</span><span class="b">' + c.type + '</span>' +
-    (isSeq(c) ? '<span class="b">' + (c.props.edge === 0 ? '下降沿采样' : '上升沿采样') + '</span>' : '') + '</div>';
+    (isSeq(c) ? '<span class="b">' + clkPins + ' ' + (fall ? '下降沿' : '上升沿') + (p.clkEdge ? '（固定）' : '') + '采样</span>' : '') + '</div>';
   h += '<div class="kv"><div class="k">名称</div><div class="v"><input data-f="label" type="text" value="' + (c.props.label || '').replace(/"/g, '&quot;') + '" placeholder="' + p.tag + c.id + '"></div>';
   if (c.type === 'SWITCH') h += '<div class="k">状态</div><div class="v"><button data-a="toggle">' + (c.props.state ? '当前 1，切换为 0' : '当前 0，切换为 1') + '</button></div>';
   if (c.type === 'CLOCK') {
@@ -677,11 +874,15 @@ function renderProps() {
   h += '<div class="k">波形</div><div class="v"><label style="cursor:pointer"><input data-f="scope" type="checkbox"' + (c.props.scope === false ? '' : ' checked') +
     '> 在波形面板显示（也可直接点波形上的信号名切换）</label></div>';
   if (isSeq(c)) {
-    const fall = c.props.edge === 0;
-    h += '<div class="k">触发沿</div><div class="v"><select data-f="edge">' +
-      '<option value="1"' + (fall ? '' : ' selected') + '>上升沿（0→1）</option>' +
-      '<option value="0"' + (fall ? ' selected' : '') + '>下降沿（1→0）</option></select> 时采样</div>';
+    if (p.clkEdge) {
+      h += '<div class="k">触发沿</div><div class="v">' + (fall ? '下降沿（1→0）' : '上升沿（0→1）') + ' —— 该芯片固定，不可改</div>';
+    } else {
+      h += '<div class="k">触发沿</div><div class="v"><select data-f="edge">' +
+        '<option value="1"' + (fall ? '' : ' selected') + '>上升沿（0→1）</option>' +
+        '<option value="0"' + (fall ? ' selected' : '') + '>下降沿（1→0）</option></select> 时采样</div>';
+    }
   }
+  if (p.hint) h += '<div class="k">说明</div><div class="v">' + p.hint + '</div>';
   if (p.varIn) h += '<div class="k">输入数</div><div class="v"><select data-f="n">' + [2, 3, 4].map(n => '<option value="' + n + '"' + ((c.props.n || p.varIn) === n ? ' selected' : '') + '>' + n + '</option>').join('') + '</select></div>';
   if (p.varOut) h += '<div class="k">分支数</div><div class="v"><select data-f="m">' + [2, 3, 4, 5, 6].map(n => '<option value="' + n + '"' + ((c.props.m || p.varOut) === n ? ' selected' : '') + '>' + n + '</option>').join('') + '</select> 条支路</div>';
   h += '</div><div class="kv" style="margin-top:8px">';
@@ -712,6 +913,182 @@ function bindProps(el) {
     evaluateAll();
   };
 }
+
+/* ---------------- 真值表 ---------------- */
+const tt = { mode: 'auto' };
+const TT_CHARS = '0123456789AbCdEF';
+const TT_HAND = {
+  LED: { cols: ['A', '指示灯'], nin: 1, rows: [[1, '亮'], [0, '灭'], ['X', '不亮（未知）']],
+    curOf: i => i[0] === 1 ? 0 : i[0] === 0 ? 1 : 2,
+    note: '指示灯没有输出脚，波形面板里列的是它的输入。' },
+  DFF: { cols: ['D', 'CLK', 'Q', 'Q̄'], nin: 2, rows: [
+    [0, '↑', 0, 1], [1, '↑', 1, 0], ['-', '无沿', 'Q 保持', 'Q̄ 保持']],
+    note: '只有电平变化的那一拍才写入：上升沿 0→1，下降沿 1→0（属性面板可切换）；D 悬空按 0 处理。' },
+  JKFF: { cols: ['J', 'K', 'CLK', 'Q'], nin: 3, rows: [
+    [0, 0, '↑', 'Q 保持'], [0, 1, '↑', 0], [1, 0, '↑', 1], [1, 1, '↑', '翻转'], ['-', '-', '无沿', 'Q 保持']],
+    note: 'J=K=1 时每来一个沿翻一次，接成 T 触发器；下降沿设置把 ↑ 换成 ↓。' },
+  LS74: { cols: ['1D', '1CP', '1R̄D', '1S̄D', '1Q', '1Q̄'], nin: 4, rows: [
+    ['-', '-', 0, 1, 0, 1], ['-', '-', 1, 0, 1, 0], ['-', '-', 0, 0, 1, 1],
+    [0, '↑', 1, 1, 0, 1], [1, '↑', 1, 1, 1, 0], ['-', '无沿', 1, 1, 'Q 保持', 'Q̄ 保持']],
+    note: '异步端（R̄D/S̄D）低电平有效、优先于时钟沿，两者同时为 0 时 Q 与 Q̄ 都是 1（真芯片如此）。2 路脚名换成 2D/2CP/2R̄D/2S̄D→2Q/2Q̄，规则完全一样。' },
+  LS90: { cols: ['条件', 'CPA↓', 'CPB↓', 'QA QD QC QB'], nin: 0, rows: [
+    ['R0(1)=R0(2)=1', '-', '-', '0 0 0 0（清 0）'],
+    ['R9(1)=R9(2)=1', '-', '-', '1 0 0 1（置 9）'],
+    ['否则', '有效', '无', 'QA 翻转（÷2）'],
+    ['否则', '无', '有效', '五分频：m=QD+2QC+4QB 依次 0→1→2→3→4→0'],
+    ['否则', '无', '无', '保持'],
+    ['十进制接法', '时钟进 CPA', 'QA 接 CPB', '8421 码 0~9 递增']],
+    note: '两个时钟脚都是下降沿有效，异步端优先于计数。输出脚顺序 QA、QD、QC、QB，权重 1、2、4、8。' },
+  LS175: { cols: ['MR̄', 'CP', 'D0 D1 D2 D3', 'Q0 Q1 Q2 Q3'], nin: 2, rows: [
+    [0, '-', '-', '0 0 0 0（立即）'],
+    [1, '↑', 'a b c d', 'a b c d'],
+    [1, '无沿', '-', '保持']],
+    note: 'CP 上升沿把四路数据同时打进 Q；MR̄ 是低有效异步清零，不等时钟。D 悬空按 0。' },
+  LS194: { cols: ['CR̄', 'S1 S0', 'CP', '动作'], nin: 2, rows: [
+    [0, '-', '-', 'Q0~Q3 立即清 0'],
+    [1, '0 0', '↑', '保持'],
+    [1, '0 1', '↑', '右移：DSR→Q0→Q1→Q2→Q3'],
+    [1, '1 0', '↑', '左移：DSL→Q3→Q2→Q1→Q0'],
+    [1, '1 1', '↑', '并行置入 I0~I3'],
+    [1, '-', '无沿', '保持']],
+    note: '模式脚 S1S0 必须在沿到来之前就摆好；S 悬空按 0（=保持）。' },
+};
+const ttEsc = s => String(s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+const ttCell = v => v === 1 ? '<span class="v1">1</span>' : v === 0 ? '<span class="v0">0</span>'
+  : (v === X || v === 'X') ? '<span class="vX">X</span>'
+    : v === '-' ? '<span style="color:#566173">–</span>' : ttEsc(v);
+const ttCharOfLit = lit => { for (const ch of TT_CHARS) if (segsOf(ch) === lit) return ch; return lit ? '自定义' : '（灭）'; };
+const ttLedText = c => { const v = inValues(c)[0]; return v === 1 ? '亮' : v === 0 ? '灭' : 'X'; };
+const ttDispText = c => {
+  const st = dispState(c);
+  if (st.mark) return '?';
+  return c.type === 'NUM' ? hexChar(st.value) : ttCharOfLit(st.lit);
+};
+// 临时元件只用来算函数值：输入用 pinFix 直接喂，不进画布、不占用 id
+function ttProbe(type, props) {
+  const nid = state.nextId, c = mk(type, 0, 0, props);
+  state.nextId = nid;
+  return c;
+}
+function ttHand(c, t) {
+  return { title: PARTS[c.type].title + '（' + label(c) + '）功能表', cols: t.cols, nin: t.nin, rows: t.rows.map(r => r.slice()),
+    cur: t.curOf ? t.curOf(inValues(c)) : -1, note: t.note };
+}
+function ttOfComp(c) {
+  const p = PARTS[c.type];
+  if (p.cat === 'src') return c.type === 'CLOCK'
+    ? { title: p.title + '（' + label(c) + '）', note: '时钟的输出只跟着节拍走：自动模式每 N 拍翻转一次，手动模式靠「运行／单步」推进，所以没有真值表。想把它当输入列举，用「整个电路」模式。' }
+    : { title: p.title + '（' + label(c) + '）', note: '开关只有 0 和 1 两个电平，没有真值表。在画布上点它就能翻转，它的两个状态就是真值表里的两行。' };
+  if (TT_HAND[c.type]) return ttHand(c, TT_HAND[c.type]);
+  const cur = inValues(c), probe = ttProbe(c.type, c.props), rows = [];
+  const msb = (m, n) => { const iv = []; for (let i = 0; i < n; i++) iv.push((m >> (n - 1 - i)) & 1); return iv; };
+  const lsb = (m, n) => { const iv = []; for (let i = 0; i < n; i++) iv.push((m >> i) & 1); return iv; };
+  if (c.type === 'SEV') {
+    const cols = ['显示'].concat(SEG.split(''));
+    for (const ch of TT_CHARS) {
+      const lit = segsOf(ch);
+      rows.push([ch].concat(SEG.split('').map(k => lit.indexOf(k) >= 0 ? 1 : 0)));
+    }
+    probe.pinFix = cur.slice();
+    let curIdx = -1;
+    if (!cur.some(isX)) {
+      const lit = dispState(probe).lit;
+      const want = SEG.split('').map(k => lit.indexOf(k) >= 0 ? 1 : 0).join('');
+      curIdx = rows.findIndex(r => r.slice(1).join('') === want);
+    }
+    return { title: '七段数码管（' + label(c) + '）段码表', cols, nin: 1, rows, cur: curIdx,
+      note: '段脚高电平点亮，表里 1 = 该段亮。只列标准字形；当前图形不在表里就是自己拼出来的字形，画布照样显示。悬空的段脚按不亮处理。' };
+  }
+  if (c.type === 'NUM') {
+    for (let m = 0; m < 16; m++) rows.push(msb(m, 4).concat([hexChar(m)]));
+    return { title: '8421 数显（' + label(c) + '）译码表', cols: ['D(8)', 'C(4)', 'B(2)', 'A(1)', '显示'], nin: 4, rows,
+      cur: cur.some(isX) ? -1 : w4(cur),
+      note: '数显自带 8421 译码，A 权重 1、D 权重 8；显示 A、b、C、d、E、F 六个十六进制字母（七段画不出大写 B/D，按真数码管习惯用小写）。有输入悬空时画布显示 ?，表里不高亮。' };
+  }
+  if (c.type === 'LS48') {
+    for (let m = 0; m < 16; m++) {
+      probe.pinFix = lsb(m, 4);
+      const ov = p.fn(inValues(probe), probe);
+      rows.push(msb(m, 4).concat(ov).concat([m > 9 ? '（消隐）' : hexChar(m)]));
+    }
+    return { title: '74LS48（' + label(c) + '）真值表', cols: ['D(8)', 'C(4)', 'B(2)', 'A(1)'].concat(outNames(c)).concat(['显示']),
+      nin: 4, rows, cur: cur.some(isX) ? -1 : w4(cur),
+      note: '输出 a~g 高电平有效，一脚一段直接接数码管。输入 10~15 全消隐；本表不建模 LT/RBI/BI 灯脚。' };
+  }
+  const multi = c.type === 'LS86' || c.type === 'LS125';
+  const nin = multi ? 2 : Math.min(inCount(c), 6);
+  const cols = inNames(c).slice(0, nin).concat(multi ? [outNames(c)[0]] : outNames(c));
+  for (let m = 0; m < (1 << nin); m++) {
+    const iv = msb(m, nin);
+    probe.pinFix = multi ? iv.concat(new Array(inCount(c) - nin).fill(0)) : iv.slice();
+    const ov = p.fn(inValues(probe), probe);
+    rows.push(iv.concat(multi ? [ov[0]] : ov));
+  }
+  let curIdx = -1;
+  if (!cur.slice(0, nin).some(isX)) curIdx = rows.findIndex(r => r.slice(0, nin).every((v, i) => v === cur[i]));
+  return { title: p.title + '（' + label(c) + '）真值表', cols, nin, rows, cur: curIdx,
+    note: (multi ? '这片芯片四路完全一样，表按第一路列，其余路只是脚名换成 ' + outNames(c).slice(1).join('/') + '。' : '') +
+      (inCount(c) > 6 ? '输入多于 6 个，只枚举前 6 个。' : '') +
+      '最左边的输入列是最高位。悬空/未知记作 X：门的任一输入是 X 且不能被吸收时输出就是 X；元件当前有脚悬空时表里不高亮。' };
+}
+function ttOfCircuit() {
+  const srcs = state.comps.filter(c => c.type === 'SWITCH' || (c.type === 'CLOCK' && !c.props.auto));
+  if (!srcs.length) return { title: '整个电路的真值表', note: '还没有可枚举的输入：先放几个开关，或把时钟的模式改成手动（取消勾选「跟随节拍自动翻转」），真值表就按这些输入列出所有组合。' };
+  const enumS = srcs.slice(0, 6), holdS = srcs.slice(6);
+  const outs = [];
+  state.comps.forEach(c => {
+    if (PARTS[c.type].cat === 'src') return;
+    if (c.type === 'SEV' || c.type === 'NUM') outs.push({ disp: true, c, name: label(c) + '.显示' });
+    else if (c.type === 'LED') outs.push({ led: true, c, name: label(c) + '.灯' });
+    else outNames(c).forEach((n, i) => outs.push({ c, i, name: label(c) + '.' + n }));
+  });
+  const cap = 14, shown = outs.slice(0, cap);
+  if (!shown.length) return { title: '整个电路的真值表', note: '电路里没有输出（指示灯/数码管/数显/芯片输出都算输出），加一个输出元件就能看真值表。' };
+  const orig = enumS.map(c => c.props.state), rows = [], lim = 1 << enumS.length;
+  for (let m = 0; m < lim; m++) {
+    const iv = []; for (let i = 0; i < enumS.length; i++) iv.push((m >> (enumS.length - 1 - i)) & 1);
+    enumS.forEach((c, i) => c.props.state = iv[i]);
+    settle();
+    rows.push(iv.concat(shown.map(o => o.disp ? ttDispText(o.c) : o.led ? ttLedText(o.c) : o.c.out[o.i])));
+  }
+  enumS.forEach((c, i) => c.props.state = orig[i]);
+  settle();
+  const cur = enumS.map(c => c.props.state ? 1 : 0);
+  return { title: '整个电路的真值表（' + enumS.length + ' 入 ' + shown.length + ' 出）',
+    cols: enumS.map(c => label(c)).concat(shown.map(o => o.name)), nin: enumS.length, rows,
+    cur: rows.findIndex(r => r.slice(0, enumS.length).every((v, i) => v === cur[i])),
+    note: (holdS.length ? '输入超过 6 个，' + holdS.map(label).join('、') + ' 保持当前电平不参与枚举。' : '') +
+      (outs.length > cap ? '输出只显示前 ' + cap + ' 列。' : '') +
+      '表按当前电路结构生成；时序元件（触发器/寄存器/计数器）保持现在锁住的状态，不会在表里逐个沿展开。' };
+}
+function renderTruth() {
+  if (document.body.classList.contains('noside')) return;
+  const sel = [...state.sel];
+  let mode = tt.mode;
+  if (mode === 'auto') mode = sel.length === 1 ? 'comp' : 'circuit';
+  const t = mode === 'comp' && sel.length === 1 ? ttOfComp(byId(sel[0])) : ttOfCircuit();
+  let h = '<div class="ttbar"><button data-m="comp" class="' + (mode === 'comp' ? 'on' : '') + '">选中元件</button>' +
+    '<button data-m="circuit" class="' + (mode === 'circuit' ? 'on' : '') + '">整个电路</button>' +
+    (mode === 'comp' && sel.length !== 1 ? '<span>没选中单个元件时自动看整个电路</span>' : '') + '</div>';
+  h += '<div class="tth">' + ttEsc(t.title) + '</div>';
+  if (t.rows) {
+    const mark = t.cur >= 0;
+    h += '<table class="tt"><thead><tr>' + t.cols.map(c => '<th>' + ttEsc(c) + '</th>').join('') +
+      (mark ? '<th></th>' : '') + '</tr></thead><tbody>';
+    t.rows.forEach((r, ri) => {
+      h += '<tr' + (ri === t.cur ? ' class="cur"' : '') + '>' + r.map((v, i) => '<td' + (i < t.nin ? ' class="in"' : '') + '>' + ttCell(v) + '</td>').join('') +
+        (ri === t.cur ? '<td style="border-color:#2f6b48;color:#8ef0bd">当前</td>' : '') + '</tr>';
+    });
+    h += '</tbody></table>';
+  }
+  if (t.note) h += '<p class="ttnote">' + ttEsc(t.note) + '</p>';
+  $('truthBody').innerHTML = h;
+}
+$('truthBody').onclick = e => {
+  const m = e.target.dataset.m; if (!m) return;
+  tt.mode = m === tt.mode ? 'auto' : m;
+  renderTruth();
+};
 
 /* ---------------- 结构操作 ---------------- */
 function snapshot() { undoStack.push(serialize()); if (undoStack.length > 60) undoStack.shift(); }
@@ -748,7 +1125,7 @@ function addComp(type, x, y) {
   const props = {};
   if (PARTS[type].varIn) props.n = PARTS[type].varIn;
   if (PARTS[type].varOut) props.m = PARTS[type].varOut;
-  if (PARTS[type].cat === 'seq') props.edge = 1;
+  if (PARTS[type].step && !PARTS[type].clkEdge) props.edge = 1;
   const probe = mk(type, x, y, props);
   if (type === 'CLOCK') { probe.props.auto = true; probe.props.div = 1; }
   const pos = freeSpot(type, x + boxOf(probe).w / 2, y + boxOf(probe).h / 2);
@@ -980,6 +1357,8 @@ GROUPS.forEach(([gname, list]) => {
     const d = document.createElement('div');
     d.className = 'item'; d.draggable = true; d.title = '单击放置或拖到画布：' + PARTS[t].title;
     const cv = document.createElement('canvas');
+    const probeProps = PARTS[t].varIn ? { n: 2 } : {};
+    if (boxOf({ type: t, x: 0, y: 0, props: probeProps }).h > 90) cv.style.height = '78px';
     d.appendChild(cv);
     const s = document.createElement('span'); s.textContent = PARTS[t].title; d.appendChild(s);
     d.onclick = () => { const p = centerWorld(), b = boxOf({ type: t, x: 0, y: 0, props: {} }); addComp(t, p.x - b.w / 2, p.y - b.h / 2); };
@@ -990,6 +1369,8 @@ GROUPS.forEach(([gname, list]) => {
       const g = cv.getContext('2d'), r = cv.getBoundingClientRect();
       const c = mk(t, 4, 2, PARTS[t].varIn ? { n: 2 } : {});
       if (t === 'SWITCH') c.props.state = 1;
+      if (t === 'SEV') c.pinFix = new Array(7).fill(1);
+      if (t === 'NUM') c.pinFix = [0, 0, 0, 0];
       if (t === 'CLOCK') { c.props.auto = true; c.props.state = 1; c.out = [1]; }
       c.out = c.out.map((_, i) => i === 0 ? 1 : 0);
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1016,10 +1397,14 @@ function setRun(v) {
 }
 $('bRun').onclick = () => setRun(!state.running);
 $('bStep').onclick = () => { setRun(false); advance(); };
-$('bReset').onclick = () => { snapshot(); setRun(false); state.tick = 0; resetScope(); for (const c of state.comps) if (isSeq(c)) { c.out = new Array(outCount(c)).fill(0).map((_, i) => i === 1 ? 1 : 0); c.prevClk = X; } evaluateAll(); };
+$('bReset').onclick = () => { snapshot(); setRun(false); state.tick = 0; resetScope(); for (const c of state.comps) if (isSeq(c)) { c.out = initOuts(c); c.prevClk = new Array(inCount(c)).fill(X); } evaluateAll(); };
 $('hz').oninput = e => { state.hz = +e.target.value; $('hzv').textContent = state.hz + ' Hz'; };
 $('bUndo').onclick = () => { if (undoStack.length) { applyState(undoStack.pop()); evaluateAll(); } };
-$('preset').onchange = e => { if (!e.target.value) return; snapshot(); loadPreset(e.target.value); e.target.value = ''; toast('已载入示例：' + e.target.selectedOptions[0].text); };
+$('preset').onchange = e => {
+  const v = e.target.value; if (!v) return;
+  const name = e.target.selectedOptions[0].text;
+  snapshot(); loadPreset(v); e.target.value = ''; toast('已载入示例：' + name);
+};
 $('bSave').onclick = () => { LS.setItem(LSKEY, serialize()); toast('已存到浏览器本地；换设备请用「导出」'); };
 $('bOpen').onclick = () => { const s = LS.getItem(LSKEY); if (!s) return toast('浏览器里还没有存档'); snapshot(); applyState(s); evaluateAll(); fitView(); toast('已载入存档'); };
 $('bExport').onclick = () => {
@@ -1055,8 +1440,16 @@ document.querySelectorAll('.tabs [data-p]').forEach(b => b.onclick = () => {
 $('bMax').onclick = () => {
   const c = document.body.classList.toggle('nomax');
   $('bMax').textContent = c ? '展开' : '收起';
-  fitCanvas(scopeCv); draw();
+  fitCanvas(scopeCv); fitCanvas(board); draw();
 };
+function setSide(open) {
+  document.body.classList.toggle('noside', !open);
+  $('bSide').classList.toggle('on', open);
+  if (open) renderTruth();
+  fitCanvas(board); draw();
+}
+$('bSide').onclick = () => setSide(document.body.classList.contains('noside'));
+$('bSideHide').onclick = () => setSide(false);
 $('tipClose').onclick = () => { $('tip').style.display = 'none'; LS.setItem(LSKEY + '.tip', '1'); };
 let toastT = 0;
 function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 1600); }
@@ -1079,9 +1472,9 @@ function serialize() {
 function applyState(json) {
   const o = typeof json === 'string' ? JSON.parse(json) : json;
   state.comps = (o.comps || []).map(c => {
-    const p = { ...c, props: c.props || {}, out: [], prevClk: X };
-    p.out = new Array(outCount(p)).fill(0);
-    if (isSeq(p)) p.out = p.out.map(() => 0);
+    const p = { ...c, props: c.props || {} };
+    p.out = initOuts(p);
+    p.prevClk = new Array(inCount(p)).fill(X);
     return p;
   });
   state.wires = (o.wires || []).filter(w => w && w.a && w.b && byId(w.a.id) && byId(w.b.id));
@@ -1089,7 +1482,7 @@ function applyState(json) {
   state.nextId = Math.max(o.nextId || 0, ...state.comps.map(c => c.id + 1), 1);
   state.sel.clear(); state.selWire = null;
   resetScope();
-  for (const c of state.comps) if (isSeq(c)) c.prevClk = inValues(c)[inCount(c) - 1];
+  for (const c of state.comps) if (isSeq(c)) c.prevClk = inValues(c);
 }
 function W(sa, pa, sb, pb) { return { a: { id: sa.id, p: pa, side: 'out' }, b: { id: sb.id, p: pb, side: 'in' } }; }
 const PRESETS = {
@@ -1130,6 +1523,87 @@ const PRESETS = {
       ],
     };
   },
+  ls90() {
+    const clr = mk('SWITCH', 110, 100, { state: 0, label: '清零' });
+    const clk = mk('CLOCK', 110, 300, { auto: true, div: 1, label: '时钟' });
+    const n = mk('LS90', 360, 90, { label: 'QA→CPB 十进制' });
+    const l1 = mk('LED', 640, 90, { label: '1 (QA)' });
+    const l2 = mk('LED', 640, 146, { label: '2 (QD)' });
+    const l3 = mk('LED', 640, 202, { label: '4 (QC)' });
+    const l4 = mk('LED', 640, 258, { label: '8 (QB)' });
+    return {
+      comps: [clr, clk, n, l1, l2, l3, l4],
+      wires: [
+        W(clr, 0, n, 0), W(clr, 0, n, 1), W(clk, 0, n, 2), W(n, 0, n, 5),
+        W(n, 0, l1, 0), W(n, 1, l2, 0), W(n, 2, l3, 0), W(n, 3, l4, 0),
+      ],
+    };
+  },
+  display90() {
+    const clk = mk('CLOCK', -340, 40, { auto: true, div: 1, label: '时钟' });
+    const clr = mk('SWITCH', -340, 180, { state: 0, label: '清零' });
+    const n = mk('LS90', -120, 0, { label: 'LS90 十进制' });
+    const num = mk('NUM', 160, 10, { label: '直接数显' });
+    const d = mk('LS48', 160, 190, { label: '译码器' });
+    const sev = mk('SEV', 430, 170, { label: '外接数码管' });
+    return {
+      comps: [clk, clr, n, num, d, sev],
+      wires: [
+        W(clk, 0, n, 2), W(clr, 0, n, 0), W(clr, 0, n, 1), W(n, 0, n, 5),
+        W(n, 0, num, 0), W(n, 1, num, 1), W(n, 2, num, 2), W(n, 3, num, 3),
+        W(n, 0, d, 0), W(n, 1, d, 1), W(n, 2, d, 2), W(n, 3, d, 3),
+        W(d, 0, sev, 0), W(d, 1, sev, 1), W(d, 2, sev, 2), W(d, 3, sev, 3),
+        W(d, 4, sev, 4), W(d, 5, sev, 5), W(d, 6, sev, 6),
+      ],
+    };
+  },
+  reg175() {
+    const clk = mk('CLOCK', -340, 40, { auto: true, div: 2, label: '时钟 ÷2' });
+    const clr = mk('SWITCH', -340, 180, { state: 1, label: '清零 MR̄' });
+    const d0 = mk('SWITCH', -160, 40, { state: 1, label: 'D0 (1)' });
+    const d1 = mk('SWITCH', -160, 116, { state: 0, label: 'D1 (2)' });
+    const d2 = mk('SWITCH', -160, 192, { state: 1, label: 'D2 (4)' });
+    const d3 = mk('SWITCH', -160, 268, { state: 0, label: 'D3 (8)' });
+    const r = mk('LS175', 100, 20, { label: '存 4 位' });
+    const q0 = mk('LED', 380, 40, { label: 'Q0' });
+    const q1 = mk('LED', 380, 116, { label: 'Q1' });
+    const q2 = mk('LED', 380, 192, { label: 'Q2' });
+    const q3 = mk('LED', 380, 268, { label: 'Q3' });
+    return {
+      comps: [clk, clr, d0, d1, d2, d3, r, q0, q1, q2, q3],
+      wires: [
+        W(clr, 0, r, 0), W(clk, 0, r, 1),
+        W(d0, 0, r, 2), W(d1, 0, r, 3), W(d2, 0, r, 4), W(d3, 0, r, 5),
+        W(r, 0, q0, 0), W(r, 1, q1, 0), W(r, 2, q2, 0), W(r, 3, q3, 0),
+      ],
+    };
+  },
+  reg194() {
+    const clk = mk('CLOCK', -360, 20, { auto: true, div: 2, label: '时钟 ÷2' });
+    const clr = mk('SWITCH', -360, 160, { state: 1, label: '清零 CR̄' });
+    const s0 = mk('SWITCH', -360, 236, { state: 1, label: 'S0' });
+    const s1 = mk('SWITCH', -360, 312, { state: 1, label: 'S1' });
+    const dsr = mk('SWITCH', -360, 388, { state: 0, label: '右移入口 DSR' });
+    const dsl = mk('SWITCH', -360, 464, { state: 0, label: '左移入口 DSL' });
+    const i0 = mk('SWITCH', -170, 160, { state: 1, label: 'I0' });
+    const i1 = mk('SWITCH', -170, 236, { state: 0, label: 'I1' });
+    const i2 = mk('SWITCH', -170, 312, { state: 0, label: 'I2' });
+    const i3 = mk('SWITCH', -170, 388, { state: 0, label: 'I3' });
+    const r = mk('LS194', 60, 0, { label: 'S1S0=11 置数 / 01 右移' });
+    const q0 = mk('LED', 360, 60, { label: 'Q0' });
+    const q1 = mk('LED', 360, 140, { label: 'Q1' });
+    const q2 = mk('LED', 360, 220, { label: 'Q2' });
+    const q3 = mk('LED', 360, 300, { label: 'Q3' });
+    return {
+      comps: [clk, clr, s0, s1, dsr, dsl, i0, i1, i2, i3, r, q0, q1, q2, q3],
+      wires: [
+        W(clr, 0, r, 0), W(s0, 0, r, 1), W(s1, 0, r, 2),
+        W(dsr, 0, r, 3), W(dsl, 0, r, 4), W(clk, 0, r, 5),
+        W(i0, 0, r, 6), W(i1, 0, r, 7), W(i2, 0, r, 8), W(i3, 0, r, 9),
+        W(r, 0, q0, 0), W(r, 1, q1, 0), W(r, 2, q2, 0), W(r, 3, q3, 0),
+      ],
+    };
+  },
 };
 function loadPreset(name) {
   const built = PRESETS[name]();
@@ -1166,6 +1640,7 @@ function loop(ts) {
 }
 
 fitCanvas(board); fitCanvas(scopeCv);
+if (matchMedia('(max-width:900px)').matches) setSide(false);
 const saved = LS.getItem(LSKEY);
 if (saved) { try { applyState(saved); } catch { loadPreset('divider'); } } else loadPreset('divider');
 if (LS.getItem(LSKEY + '.tip')) $('tip').style.display = 'none';
